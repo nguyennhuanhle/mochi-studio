@@ -198,8 +198,14 @@ pub fn export_cancel(app: AppHandle, exports: State<'_, ExportAppState>, job_id:
 /// Hộp thoại chọn nơi lưu file xuất.
 #[tauri::command]
 #[specta::specta]
-pub async fn export_pick_path(app: AppHandle, current: PathBuf, gif: bool) -> Option<PathBuf> {
-    let (label, ext) = if gif { ("GIF", "gif") } else { ("MP4", "mp4") };
+pub async fn export_pick_path(app: AppHandle, current: PathBuf, format: mochi_export::ExportFormat) -> Option<PathBuf> {
+    use mochi_export::ExportFormat;
+    let (label, ext) = match format {
+        ExportFormat::Gif => ("GIF", "gif"),
+        ExportFormat::M4a => ("M4A", "m4a"),
+        ExportFormat::Mp3 => ("MP3", "mp3"),
+        ExportFormat::Mp4 => ("MP4", "mp4"),
+    };
     let mut dialog = app.dialog().file().add_filter(label, &[ext]);
     if let Some(dir) = current.parent().filter(|d| d.is_dir()) {
         dialog = dialog.set_directory(dir);
@@ -208,6 +214,24 @@ pub async fn export_pick_path(app: AppHandle, current: PathBuf, gif: bool) -> Op
         dialog = dialog.set_file_name(name.to_string_lossy());
     }
     dialog.blocking_save_file().and_then(|f| f.into_path().ok())
+}
+
+/// S08 (v1): kiểm tra phiên bản mới = mở trang Releases trên trình duyệt. App KHÔNG tự gửi request
+/// (K-S1: không kết nối mạng); trình duyệt của người dùng làm việc đó khi họ bấm.
+pub const RELEASES_URL: &str = "https://github.com/nguyennhuanhle/mochi-studio/releases";
+
+#[tauri::command]
+#[specta::specta]
+pub fn open_releases_page(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().open_url(RELEASES_URL, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Phiên bản app đang chạy (để so với trang Releases).
+#[tauri::command]
+#[specta::specta]
+pub fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 /// Thư mục mặc định cho file xuất: thư mục lưu bản quay (Videos\Mochi Studio).

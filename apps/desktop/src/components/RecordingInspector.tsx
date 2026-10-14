@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { commands, type Clip, type EditOp, type MediaItem, type RecordingFx, type Ticks, type ZoomSegment } from "../bindings";
+import { commands, type Clip, type EditOp, type FxPreset, type MediaItem, type RecordingFx, type Ticks, type ZoomSegment } from "../bindings";
 import { formatTimecode, secs, ticks } from "../lib/editor";
 import { Check, ColorField, Section, Select, Slider } from "./controls";
 import HighlightControls from "./HighlightControls";
+import PresetBar from "./PresetBar";
 
 function cornerCenter(c: "topLeft" | "topRight" | "bottomLeft" | "bottomRight") {
   return { x: c.endsWith("Left") ? 0.15 : 0.85, y: c.startsWith("top") ? 0.15 : 0.85 };
@@ -61,6 +62,8 @@ export default function RecordingInspector(props: {
 
   return (
     <div className="stack">
+      {/* E14: preset hiệu ứng (nền, con trỏ, webcam) — zoom của clip giữ nguyên khi áp. */}
+      <FxPresets fx={fx} onApply={(p) => set((f) => ({ ...f, background: p.background, cursor: p.cursor, camera: p.camera }))} />
       <Section title={t("polish.background")}>
         {/* Tắt = trọn khung hình đã quay (không nền, khoảng đệm, bo góc, đổ bóng). Áp cho mọi clip của bản quay này. */}
         <Check
@@ -333,6 +336,29 @@ export default function RecordingInspector(props: {
         </button>
       )}
     </div>
+  );
+}
+
+function FxPresets(props: { fx: RecordingFx; onApply: (fx: RecordingFx) => void }) {
+  const [presets, setPresets] = useState<FxPreset[]>([]);
+  useEffect(() => {
+    commands.settingsGet().then((s) => setPresets(s.fxPresets));
+  }, []);
+  const save = async (next: FxPreset[]) => {
+    const s = await commands.settingsGet();
+    await commands.settingsSet({ ...s, fxPresets: next });
+    setPresets(next);
+  };
+  return (
+    <PresetBar
+      names={presets.map((p) => p.name)}
+      onApply={(name) => {
+        const p = presets.find((x) => x.name === name);
+        if (p) props.onApply(p.fx);
+      }}
+      onSave={(name) => save([...presets.filter((p) => p.name !== name), { name, fx: { ...props.fx, zoom: { ...props.fx.zoom, segments: [] } } }])}
+      onDelete={(name) => save(presets.filter((p) => p.name !== name))}
+    />
   );
 }
 

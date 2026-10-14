@@ -42,6 +42,8 @@ pub enum PlayerCommand {
     Step(i32),
     /// Bỏ project và mọi decoder (đóng file media); trả lời khi xong.
     Unload { done: mpsc::Sender<()> },
+    /// X08: lưu khung tại đầu phát thành PNG, độ phân giải canvas, vẽ từ file gốc (không proxy).
+    Snapshot { path: PathBuf, done: mpsc::Sender<Result<(u32, u32), String>> },
     Shutdown,
 }
 
@@ -203,6 +205,22 @@ fn run(
                     renderer.clear();
                     audio.clear();
                     let _ = done.send(());
+                }
+                PlayerCommand::Snapshot { path, done } => {
+                    let r = match project.clone() {
+                        None => Err("chưa mở project".to_string()),
+                        Some(p) => {
+                            let (tex, _) = rt.block_on(renderer.render(&p, &paths, t, true));
+                            let (w, h) = (tex.width(), tex.height());
+                            let rgba = mochi_render::read_texture_rgba(&gpu, &tex);
+                            image::RgbaImage::from_raw(w, h, rgba)
+                                .ok_or_else(|| "khung rỗng".to_string())
+                                .and_then(|img| img.save(&path).map_err(|e| e.to_string()))
+                                .map(|()| (w, h))
+                        }
+                    };
+                    let _ = done.send(r);
+                    dirty = true; // vẽ lại preview (bằng proxy nếu đang dùng)
                 }
                 PlayerCommand::Shutdown => return,
             }

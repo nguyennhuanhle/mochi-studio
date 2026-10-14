@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useBrand } from "../lib/brand";
 
 /**
  * Thanh trượt chỉ gửi lệnh khi thả chuột / nhả phím — một lần kéo = một bước undo,
@@ -61,20 +62,41 @@ export function ColorField(props: { label: ReactNode; value: string; onCommit: (
   const [v, setV] = useState(props.value);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => setV(props.value), [props.value]);
+  // E14: màu thương hiệu → ô màu nhanh.
+  const brand = useBrand();
   return (
-    <label className="row space">
-      <span>{props.label}</span>
-      <input
-        type="color"
-        value={v.slice(0, 7)}
-        onChange={(e) => {
-          const next = e.target.value.toUpperCase();
-          setV(next);
-          window.clearTimeout(timer.current);
-          timer.current = window.setTimeout(() => props.onCommit(next), 350);
-        }}
-      />
-    </label>
+    <div className="stack color-field">
+      <label className="row space">
+        <span>{props.label}</span>
+        <input
+          type="color"
+          value={v.slice(0, 7)}
+          onChange={(e) => {
+            const next = e.target.value.toUpperCase();
+            setV(next);
+            window.clearTimeout(timer.current);
+            timer.current = window.setTimeout(() => props.onCommit(next), 350);
+          }}
+        />
+      </label>
+      {brand.colors.length > 0 && (
+        <span className="row swatches">
+          {brand.colors.map((c) => (
+            <button
+              key={c}
+              className={c.toUpperCase() === v.slice(0, 7).toUpperCase() ? "swatch on" : "swatch"}
+              style={{ background: c }}
+              title={c}
+              aria-label={c}
+              onClick={() => {
+                setV(c);
+                props.onCommit(c);
+              }}
+            />
+          ))}
+        </span>
+      )}
+    </div>
   );
 }
 

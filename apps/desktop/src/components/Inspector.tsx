@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Clip, EditOp, ProjectView, Ticks } from "../bindings";
 import { formatTimecode, secs, ticks } from "../lib/editor";
+import ClipFxInspector from "./ClipFxInspector";
 import OverlayInspector from "./OverlayInspector";
 import RecordingInspector from "./RecordingInspector";
 
@@ -134,6 +135,7 @@ export default function Inspector(props: {
             }
           />
         )}
+        <ClipFxInspector clip={clip} playhead={props.playhead} apply={props.apply} />
       </div>
     </aside>
   );

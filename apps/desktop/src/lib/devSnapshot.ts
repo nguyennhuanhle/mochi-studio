@@ -61,6 +61,13 @@ export async function runDevSnapshot(navigate: (to: string) => void) {
     await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
     return;
   }
+  if (mode.startsWith("v1")) {
+    const { runV1 } = await import("./devV1");
+    await runV1(mode, { navigate, outDir, snap, log, sleep });
+    un();
+    await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
+    return;
+  }
   if (mode === "cdp") {
     await cdpSnapshot(navigate, outDir, log, sleep);
     un();

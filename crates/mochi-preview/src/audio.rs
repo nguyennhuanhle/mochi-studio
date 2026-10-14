@@ -312,7 +312,8 @@ fn mix(st: &MixState, start: i64, tick_per_frame: f64, frames: usize, channels: 
     let Some(project) = &st.project else { return };
     let end = start + (frames as f64 * tick_per_frame) as i64;
     for clip in &project.clips {
-        if clip.muted || clip.start.0 >= end || clip.end().0 <= start {
+        // Freeze frame (E04) không có tiếng.
+        if clip.muted || clip.hold.is_some() || clip.start.0 >= end || clip.end().0 <= start {
             continue;
         }
         let Some(track) = project.tracks.iter().find(|t| t.id == clip.track_id) else {

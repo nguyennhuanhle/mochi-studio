@@ -42,6 +42,44 @@ pub struct Settings {
     pub cache_limit_gb: u32,
     /// S03: preview dùng proxy khi có (tắt → luôn đọc file gốc).
     pub use_proxies: bool,
+    /// R11 (v1): cấu hình quay có tên.
+    pub recording_presets: Vec<RecordingPreset>,
+    /// E14 (v1): preset hiệu ứng bản quay (nền, con trỏ, webcam) có tên.
+    pub fx_presets: Vec<FxPreset>,
+    /// E14 (v1): theme thương hiệu — màu gợi ý cho ô màu, font mặc định cho chữ mới.
+    pub brand: BrandTheme,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordingPreset {
+    pub name: String,
+    pub config: RecordingConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FxPreset {
+    pub name: String,
+    pub fx: mochi_project::RecordingFx,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BrandTheme {
+    /// "#RRGGBB", tối đa 8 màu.
+    pub colors: Vec<String>,
+    /// Họ font cho chữ mới (rỗng = font mặc định).
+    pub font: String,
+}
+
+impl Default for BrandTheme {
+    fn default() -> Self {
+        Self {
+            colors: ["#FFFFFF", "#1D1B26", "#E2557B", "#FFD54A", "#4FC3F7", "#2F9E6B"].map(String::from).to_vec(),
+            font: String::new(),
+        }
+    }
 }
 
 impl Default for Settings {
@@ -54,6 +92,9 @@ impl Default for Settings {
             recent_projects: vec![],
             cache_limit_gb: 20,
             use_proxies: true,
+            recording_presets: vec![],
+            fx_presets: vec![],
+            brand: BrandTheme::default(),
         }
     }
 }

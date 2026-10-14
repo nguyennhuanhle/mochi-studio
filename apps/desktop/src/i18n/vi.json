@@ -17,7 +17,9 @@
     "openProject": "Mở project…",
     "recent": "Project gần đây",
     "noRecent": "Chưa có project nào.",
-    "newProject": "Project trống"
+    "newProject": "Project trống",
+    "openZip": "Mở gói .zip…",
+    "unpackFailed": "Không mở được gói: {{detail}}"
   },
   "record": {
     "title": "Thiết lập quay",
@@ -215,7 +217,9 @@
     "removeTrackLocked": "Track đang khóa — mở khóa để xóa",
     "removeTrackTitle": "Xóa track {{name}}?",
     "removeTrackBody": "Track này đang có {{count}} clip. Xóa track sẽ xóa luôn các clip đó (hoàn tác được bằng Ctrl+Z).",
-    "removeTrackConfirm": "Xóa track và clip"
+    "removeTrackConfirm": "Xóa track và clip",
+    "saveFrame": "Lưu khung hình hiện tại thành ảnh PNG",
+    "frameSaved": "Đã lưu ảnh: {{path}}"
   },
   "timelineError": {
     "notFound": "Không thấy đối tượng.",
@@ -381,7 +385,9 @@
       "encoder": "Encoder lỗi: {{message}}",
       "cancelled": "Đã hủy, không để lại file dở.",
       "crashed": "Tiến trình xuất dừng bất thường. Log: {{log}}"
-    }
+    },
+    "audioOnly": "chỉ âm thanh",
+    "summaryAudio": "Chỉ âm thanh · {{secs}} giây · khoảng {{size}}"
   },
   "jobs": {
     "proxyQueued": "Chờ tạo proxy",
@@ -452,5 +458,54 @@
     "opacity": "Độ đậm",
     "recordHint": "Không hiện trên màn hình lúc quay; có trong xem trước và video xuất, sửa / tắt được sau trong trình biên tập.",
     "noCursorData": "Bản quay này không có dữ liệu con trỏ."
+  },
+  "preset": {
+    "choose": "Chọn preset…",
+    "none": "Chưa có preset",
+    "save": "Lưu preset",
+    "saveTitle": "Lưu thành preset",
+    "name": "Tên preset",
+    "overwrite": "Ghi đè",
+    "exists": "Đã có preset \"{{name}}\" — lưu sẽ ghi đè.",
+    "delete": "Xóa preset này",
+    "needTarget": "Chọn màn hình / cửa sổ / vùng quay trước khi lưu preset"
+  },
+  "fx": {
+    "freeze": "Freeze frame",
+    "freezeSecs": "Độ dài (giây)",
+    "freezeHere": "Freeze tại đầu phát ({{at}} s)",
+    "freezeOutside": "Đưa đầu phát vào trong clip",
+    "extendLast": "Kéo dài frame cuối",
+    "freezeHint": "Chèn một đoạn hình đứng yên (không tiếng); các clip phía sau trên track này dời ra sau."
+  },
+  "marker": {
+    "title": "Marker",
+    "empty": "Chưa có marker. Bấm phím M để thêm marker tại đầu phát.",
+    "goto": "Đến marker",
+    "label": "Tên marker",
+    "delete": "Xóa marker",
+    "hint": "Phím M: thêm marker tại đầu phát. Bấm ▼ trên thước thời gian để nhảy tới."
+  },
+  "brand": {
+    "title": "Theme thương hiệu",
+    "colors": "Màu thương hiệu (hiện ở mọi ô chọn màu)",
+    "color": "Màu {{n}}",
+    "addColor": "+ Màu",
+    "removeColor": "Bỏ màu này",
+    "font": "Font cho chữ mới",
+    "hint": "Áp cho chữ thêm mới và các ô màu; chữ đã có giữ nguyên.",
+    "save": "Lưu theme"
+  },
+  "pack": {
+    "button": "Đóng gói",
+    "hint": "Đóng gói project + toàn bộ media thành một file .zip để chuyển sang máy khác",
+    "progress": "Đang đóng gói {{pct}}%",
+    "done": "Đã đóng gói: {{path}} ({{mb}} MB).",
+    "missing": "Không có trong gói (thiếu media): {{names}}",
+    "failed": "Không đóng gói được: {{detail}}"
+  },
+  "update": {
+    "check": "Kiểm tra cập nhật",
+    "hint": "Mở trang phát hành trên GitHub bằng trình duyệt (app không tự kết nối mạng)."
   }
 }

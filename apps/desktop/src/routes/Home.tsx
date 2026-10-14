@@ -13,6 +13,11 @@ export default function Home() {
   const [recent, setRecent] = useState<string[]>([]);
   /** S02: project lần trước không đóng sạch (crash) → đề nghị mở lại để khôi phục. */
   const [unclean, setUnclean] = useState<string[]>([]);
+  const [unpackError, setUnpackError] = useState<string | null>(null);
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    commands.appVersion().then(setVersion);
+  }, []);
   const { open, dialog } = useOpenProject();
 
   useEffect(() => {
@@ -52,6 +57,16 @@ export default function Home() {
         >
           {t("home.openProject")}
         </button>
+        {/* X07: mở gói .zip do "Đóng gói" tạo (giải nén cạnh file zip). */}
+        <button
+          onClick={async () => {
+            const r = await commands.projectUnpackPick();
+            if (r.status === "error") setUnpackError(r.error);
+            else if (r.data) open(r.data);
+          }}
+        >
+          {t("home.openZip")}
+        </button>
         <button
           onClick={async () => {
             const r = await commands.projectCreate(`Mochi ${new Date().toLocaleDateString()}`);
@@ -61,7 +76,19 @@ export default function Home() {
           {t("home.newProject")}
         </button>
       </div>
+      {unpackError && (
+        <div className="error-box" role="alert">
+          {t("home.unpackFailed", { detail: unpackError })}
+        </div>
+      )}
       <GpuWarning />
+      {/* S08 (v1): kiểm tra cập nhật — chỉ mở trang Releases, app không tự kết nối mạng. */}
+      <p className="muted small row">
+        Mochi Studio {version}
+        <button className="link-btn" onClick={() => commands.openReleasesPage()} title={t("update.hint")}>
+          {t("update.check")}
+        </button>
+      </p>
       {unclean.length > 0 && (
         <div className="warn-box" role="status">
           <strong>{t("recover.homeTitle")}</strong>

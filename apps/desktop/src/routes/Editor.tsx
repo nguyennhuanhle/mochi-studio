@@ -20,6 +20,9 @@ import PreviewPane from "../components/PreviewPane";
 import Timeline from "../components/Timeline";
 import { editorErrorMessage, formatTimecode, TICKS_PER_SECOND } from "../lib/editor";
 import ExportDialog from "../components/ExportDialog";
+import MarkersDialog from "../components/MarkersDialog";
+import BrandDialog from "../components/BrandDialog";
+import { brandFont } from "../lib/brand";
 import SaveFailedDialog from "../components/SaveFailedDialog";
 import RecoveredDialog from "../components/RecoveredDialog";
 
@@ -52,6 +55,7 @@ export default function Editor() {
   const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<{ ok: boolean; at: string } | null>(null);
   const [rejected, setRejected] = useState<Rejected[]>([]);
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
@@ -59,6 +63,9 @@ export default function Editor() {
   const [mediaDrag, setMediaDrag] = useState<{ media: MediaItem; x: number; y: number } | null>(null);
   const [inOut, setInOut] = useState<{ start: Ticks | null; end: Ticks | null }>({ start: null, end: null });
   const [exporting, setExporting] = useState(false);
+  const [showMarkers, setShowMarkers] = useState(false);
+  const [showBrand, setShowBrand] = useState(false);
+  const [packing, setPacking] = useState<{ done: number; total: number } | null>(null);
   const [closeError, setCloseError] = useState<EditorError | null>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -68,6 +75,10 @@ export default function Editor() {
   const showError = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast((m) => (m === msg ? null : m)), 4000);
+  }, []);
+  const showToast = useCallback((msg: string) => {
+    setInfo(msg);
+    window.setTimeout(() => setInfo((m) => (m === msg ? null : m)), 4000);
   }, []);
 
   useEffect(() => {
@@ -277,6 +288,10 @@ export default function Editor() {
         setInOut((r) => ({ start: r.start !== null && r.start < at ? r.start : null, end: at }));
       } else if (e.key.toLowerCase() === "x" && !ctrl) {
         setInOut({ start: null, end: null });
+      } else if (e.key.toLowerCase() === "m" && !ctrl) {
+        // E14: thêm marker tại đầu phát.
+        const n = (viewRef.current?.project.markers?.length ?? 0) + 1;
+        apply({ op: "addMarker", at: playheadRef.current, label: `Marker ${n}` });
       } else if (e.key === "+" || e.key === "=") {
         setPxPerSec((z) => Math.min(800, z * 1.25));
       } else if (e.key === "-") {
@@ -383,6 +398,26 @@ export default function Editor() {
           ↷
         </button>
         <button onClick={save}>{t("editor.save")}</button>
+        <button
+          disabled={packing !== null}
+          title={t("pack.hint")}
+          onClick={async () => {
+            await save();
+            setPacking({ done: 0, total: 0 });
+            const un = await events.packProgress.listen(({ payload }) => setPacking(payload));
+            const r = await commands.projectPack();
+            un();
+            setPacking(null);
+            if (r.status === "error") showError(t("pack.failed", { detail: r.error }));
+            else if (r.data)
+              showToast(
+                t("pack.done", { path: r.data.path, mb: (r.data.bytes / 1e6).toFixed(0) }) +
+                  (r.data.missing.length ? ` ${t("pack.missing", { names: r.data.missing.join(", ") })}` : ""),
+              );
+          }}
+        >
+          {packing ? t("pack.progress", { pct: packing.total ? Math.round((packing.done / packing.total) * 100) : 0 }) : `📦 ${t("pack.button")}`}
+        </button>
         <button className="primary" onClick={() => setExporting(true)} title="Ctrl+E">
           {t("export.button")}
         </button>
@@ -415,6 +450,17 @@ export default function Editor() {
             <span className="timecode">
               {formatTimecode(playhead)} / {formatTimecode(duration)}
             </span>
+            <button
+              title={t("editor.saveFrame")}
+              onClick={async () => {
+                const name = `${view.project.name}-${formatTimecode(playhead).replace(/[:.]/g, "-")}.png`;
+                const r = await commands.playerSaveFrame(name);
+                if (r.status === "error") showError(r.error);
+                else if (r.data) showToast(t("editor.frameSaved", { path: r.data }));
+              }}
+            >
+              🖼
+            </button>
             <span className="muted small">
               {/* Bộ đếm fps chỉ ở bản dev (số đo cho người phát triển). */}
               {!previewReady ? t("polish.preparing") : import.meta.env.DEV && playing && fps > 0 ? t("editor.fps", { fps: fps.toFixed(0) }) : ""}
@@ -473,7 +519,7 @@ export default function Editor() {
           onClick={() =>
             apply({
               op: "addOverlay",
-              content: { type: "text", text: t("polish.defaultText"), font: "Segoe UI", sizePx: 56, color: "#FFFFFF", background: "#1D1B26CC" },
+              content: { type: "text", text: t("polish.defaultText"), font: brandFont(), sizePx: 56, color: "#FFFFFF", background: "#1D1B26CC" },
               start: playhead,
               duration: 3 * TICKS_PER_SECOND,
               trackId: null,
@@ -498,6 +544,13 @@ export default function Editor() {
         <span className="sep" />
         <button onClick={() => apply({ op: "addTrack", kind: "video" })}>{t("editor.addVideoTrack")}</button>
         <button onClick={() => apply({ op: "addTrack", kind: "audio" })}>{t("editor.addAudioTrack")}</button>
+        <span className="sep" />
+        <button onClick={() => setShowMarkers(true)} title={t("marker.hint")}>
+          🔖 {view.project.markers?.length ?? 0}
+        </button>
+        <button onClick={() => setShowBrand(true)} title={t("brand.title")}>
+          🎨
+        </button>
         <span style={{ flex: 1 }} />
         <label className="row small">
           {t("polish.aspect")}
@@ -566,6 +619,15 @@ export default function Editor() {
       />
 
       {exporting && <ExportDialog view={view} inOut={inOut} onClose={() => setExporting(false)} />}
+      {showBrand && <BrandDialog onClose={() => setShowBrand(false)} />}
+      {showMarkers && (
+        <MarkersDialog
+          markers={view.project.markers ?? []}
+          apply={apply}
+          onSeek={(at) => commands.playerSeek(at)}
+          onClose={() => setShowMarkers(false)}
+        />
+      )}
       {closeError && (
         <SaveFailedDialog
           error={closeError}
@@ -603,6 +665,11 @@ export default function Editor() {
       {toast && (
         <div className="toast error-box" role="alert">
           {toast}
+        </div>
+      )}
+      {info && !toast && (
+        <div className="toast info-box" role="status">
+          {info}
         </div>
       )}
 

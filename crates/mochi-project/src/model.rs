@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: u32 = 1;
+/// v2 (Phase 6, v1): keyframe, transition, màu / viền / khung thiết bị, freeze frame, hình khối,
+/// callout, spotlight, marker, phụ đề, hiệu ứng âm thanh. Mọi trường mới có mặc định → v1 đọc được.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// 705.600.000 tick/giây (như Camtasia): chia hết cho mọi fps và sample rate thông dụng.
 pub const TICKS_PER_SECOND: i64 = 705_600_000;
@@ -51,6 +53,76 @@ pub struct Project {
     /// Thứ tự = z-order: phần tử đầu ở dưới cùng.
     pub tracks: Vec<Track>,
     pub clips: Vec<Clip>,
+    /// E14 (v1): marker trên timeline.
+    #[serde(default)]
+    pub markers: Vec<Marker>,
+    /// E13 (v1): phụ đề (thời gian trên timeline).
+    #[serde(default)]
+    pub captions: Vec<Caption>,
+    #[serde(default)]
+    pub caption_style: CaptionStyle,
+}
+
+/// E14: marker — một mốc có tên trên timeline (nhảy tới, xuất mỗi marker một file).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Marker {
+    pub id: String,
+    pub at: Ticks,
+    pub label: String,
+}
+
+/// E13: một dòng phụ đề. `words` (nếu có) cho phụ đề động hiện từng chữ.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Caption {
+    pub id: String,
+    pub start: Ticks,
+    pub end: Ticks,
+    pub text: String,
+    #[serde(default)]
+    pub words: Vec<CaptionWord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptionWord {
+    pub start: Ticks,
+    pub end: Ticks,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CaptionStyle {
+    /// Hiện phụ đề trong preview / video xuất (burn-in, X05).
+    pub visible: bool,
+    pub font: String,
+    /// Cỡ chữ theo % chiều cao canvas (2–10).
+    pub size: f64,
+    pub color: String,
+    /// Nền sau chữ; None = không nền.
+    pub background: Option<String>,
+    /// Vị trí theo chiều dọc (0 = trên, 1 = dưới).
+    pub y: f64,
+    /// Phụ đề động: tô màu từng chữ đang nói.
+    pub animated: bool,
+    pub highlight: String,
+}
+
+impl Default for CaptionStyle {
+    fn default() -> Self {
+        Self {
+            visible: true,
+            font: String::new(),
+            size: 4.5,
+            color: "#FFFFFF".into(),
+            background: Some("#000000B0".into()),
+            y: 0.88,
+            animated: false,
+            highlight: "#FFD54A".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -148,6 +220,12 @@ pub struct Track {
     /// E11: âm lượng của cả track (dB, cộng với âm lượng từng clip). -60…+12.
     #[serde(default)]
     pub volume_db: f64,
+    /// E14 (v1): track nam châm — xóa / dời clip thì các clip sau tự dồn lại, không để khoảng trống.
+    #[serde(default)]
+    pub magnetic: bool,
+    /// E11 (v1): ducking — track này (nhạc nền) tự nhỏ đi khi các track khác có tiếng nói.
+    #[serde(default)]
+    pub duck: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -169,9 +247,208 @@ pub struct Clip {
     pub muted: bool,
     pub transform: Option<Transform>,
     pub content: ClipContent,
+    /// E04 (v1): freeze frame — clip đứng yên ở thời điểm này trong media (không tiếng).
+    #[serde(default)]
+    pub hold: Option<Ticks>,
+    /// E12 (v1): keyframe vị trí / scale / xoay / độ mờ (thời gian tính từ đầu clip). Rỗng = `transform`.
+    #[serde(default)]
+    pub keyframes: Vec<Keyframe>,
+    /// E12 (v1): chuyển cảnh khi clip vào / ra.
+    #[serde(default)]
+    pub transition_in: Option<Transition>,
+    #[serde(default)]
+    pub transition_out: Option<Transition>,
+    /// E15 (v1): màu cơ bản, viền, bo góc, khung thiết bị.
+    #[serde(default)]
+    pub look: Look,
+    /// E11 (v1): khử ồn, chuẩn hóa độ to, nén.
+    #[serde(default)]
+    pub audio_fx: AudioFx,
+    /// E14 (v1): nhóm — các clip cùng nhóm di chuyển / xóa cùng nhau.
+    #[serde(default)]
+    pub group: Option<String>,
+}
+
+/// E12: một keyframe. `at` tính từ đầu clip; giữa hai keyframe nội suy theo `easing` của keyframe sau.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Keyframe {
+    pub at: Ticks,
+    pub x: f64,
+    pub y: f64,
+    pub scale: f64,
+    /// Độ (theo chiều kim đồng hồ).
+    pub rotation: f64,
+    pub opacity: f64,
+    pub easing: Easing,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Easing {
+    Linear,
+    EaseIn,
+    EaseOut,
+    #[default]
+    EaseInOut,
+}
+
+impl Easing {
+    pub fn apply(self, u: f64) -> f64 {
+        let u = u.clamp(0.0, 1.0);
+        match self {
+            Easing::Linear => u,
+            Easing::EaseIn => u * u * u,
+            Easing::EaseOut => 1.0 - (1.0 - u).powi(3),
+            Easing::EaseInOut => {
+                if u < 0.5 {
+                    4.0 * u * u * u
+                } else {
+                    1.0 - (-2.0 * u + 2.0).powi(3) / 2.0
+                }
+            }
+        }
+    }
+}
+
+/// E12: chuyển cảnh. Ở đầu clip mà ngay trước có clip khác trên cùng track → chuyển giữa hai clip;
+/// không có → hiện dần từ lớp bên dưới. Ở cuối clip → ẩn dần.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Transition {
+    pub kind: TransitionKind,
+    pub duration: Ticks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum TransitionKind {
+    Fade,
+    FadeBlack,
+    SlideLeft,
+    SlideRight,
+    SlideUp,
+    SlideDown,
+    WipeLeft,
+    WipeRight,
+    Zoom,
+    /// Chỉ cho chữ / callout: hiện từng ký tự.
+    Typewriter,
+}
+
+/// E15: chỉnh màu cơ bản + viền + bo góc + khung thiết bị, áp cho mọi clip có hình.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Look {
+    /// −100…100 (0 = giữ nguyên).
+    pub brightness: f64,
+    pub contrast: f64,
+    pub saturation: f64,
+    /// Độ dày viền, pixel canvas 0–40.
+    pub border_width: f64,
+    pub border_color: String,
+    /// Bo góc, % cạnh ngắn của clip 0–50.
+    pub corner_radius: f64,
+    /// Đổ bóng 0–100.
+    pub shadow: f64,
+    pub device: DeviceFrame,
+}
+
+impl Default for Look {
+    fn default() -> Self {
+        Self {
+            brightness: 0.0,
+            contrast: 0.0,
+            saturation: 0.0,
+            border_width: 0.0,
+            border_color: "#FFFFFF".into(),
+            corner_radius: 0.0,
+            shadow: 0.0,
+            device: DeviceFrame::None,
+        }
+    }
+}
+
+impl Look {
+    pub fn is_identity(&self) -> bool {
+        *self == Look::default()
+    }
+
+    pub fn clamped(mut self) -> Self {
+        let f = |v: f64, lo: f64, hi: f64, d: f64| if v.is_finite() { v.clamp(lo, hi) } else { d };
+        self.brightness = f(self.brightness, -100.0, 100.0, 0.0);
+        self.contrast = f(self.contrast, -100.0, 100.0, 0.0);
+        self.saturation = f(self.saturation, -100.0, 100.0, 0.0);
+        self.border_width = f(self.border_width, 0.0, 40.0, 0.0);
+        self.corner_radius = f(self.corner_radius, 0.0, 50.0, 0.0);
+        self.shadow = f(self.shadow, 0.0, 100.0, 0.0);
+        if !is_hex_color(&self.border_color) {
+            self.border_color = "#FFFFFF".into();
+        }
+        self
+    }
+}
+
+/// "#RRGGBB" hoặc "#RRGGBBAA".
+pub fn is_hex_color(c: &str) -> bool {
+    (c.len() == 7 || c.len() == 9) && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum DeviceFrame {
+    #[default]
+    None,
+    Laptop,
+    Phone,
+    Browser,
+}
+
+/// E11 (v1): xử lý tiếng của clip (chạy trên máy, kết quả cache trong `cache/`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AudioFx {
+    /// Khử ồn (RNNoise).
+    pub denoise: bool,
+    /// Chuẩn hóa độ to về −16 LUFS.
+    pub normalize: bool,
+    /// Nén (compressor) cho giọng nói đều hơn.
+    pub compress: bool,
 }
 
 impl Clip {
+    /// Biến đổi tại `t` (timeline): nội suy keyframe nếu có, không thì `transform` tĩnh.
+    pub fn transform_at(&self, t: Ticks) -> Transform {
+        let base = self.transform.unwrap_or_default();
+        if self.keyframes.is_empty() {
+            return base;
+        }
+        let local = t - self.start;
+        let mut ks = self.keyframes.clone();
+        ks.sort_by_key(|k| k.at);
+        let first = ks[0];
+        let last = *ks.last().unwrap();
+        let tf = |k: &Keyframe| Transform { x: k.x, y: k.y, scale: k.scale, opacity: k.opacity, rotation: k.rotation };
+        if local <= first.at {
+            return tf(&first);
+        }
+        if local >= last.at {
+            return tf(&last);
+        }
+        let i = ks.iter().position(|k| k.at > local).unwrap_or(ks.len() - 1);
+        let (a, b) = (ks[i - 1], ks[i]);
+        let span = (b.at.0 - a.at.0).max(1) as f64;
+        let u = b.easing.apply((local.0 - a.at.0) as f64 / span);
+        let lerp = |p: f64, q: f64| p + (q - p) * u;
+        Transform {
+            x: lerp(a.x, b.x),
+            y: lerp(a.y, b.y),
+            scale: lerp(a.scale, b.scale),
+            rotation: lerp(a.rotation, b.rotation),
+            opacity: lerp(a.opacity, b.opacity),
+        }
+    }
+
     /// Độ dài trên timeline = (out - in) / speed.
     pub fn duration(&self) -> Ticks {
         Ticks(((self.source_out.0 - self.source_in.0) as f64 / self.speed).round() as i64)
@@ -179,8 +456,11 @@ impl Clip {
     pub fn end(&self) -> Ticks {
         self.start + self.duration()
     }
-    /// Thời điểm trong media ứng với thời điểm `t` trên timeline.
+    /// Thời điểm trong media ứng với thời điểm `t` trên timeline (freeze frame → luôn `hold`).
     pub fn source_time_at(&self, t: Ticks) -> Ticks {
+        if let Some(h) = self.hold {
+            return h;
+        }
         self.source_in + Ticks(((t.0 - self.start.0) as f64 * self.speed).round() as i64)
     }
 }
@@ -193,11 +473,14 @@ pub struct Transform {
     pub y: f64,
     pub scale: f64,
     pub opacity: f64,
+    /// E12 (v1): xoay, độ (theo chiều kim đồng hồ).
+    #[serde(default)]
+    pub rotation: f64,
 }
 
 impl Default for Transform {
     fn default() -> Self {
-        Self { x: 0.5, y: 0.5, scale: 1.0, opacity: 1.0 }
+        Self { x: 0.5, y: 0.5, scale: 1.0, opacity: 1.0, rotation: 0.0 }
     }
 }
 
@@ -229,11 +512,58 @@ pub enum ClipContent {
         pixelate: bool,
         strength: f64,
     },
+    /// E10 (v1): hình khối / mũi tên / đường kẻ. (x0, y0) → (x1, y1) chuẩn hóa 0–1 trên canvas.
+    #[serde(rename_all = "camelCase")]
+    Shape {
+        shape: ShapeKind,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        stroke: String,
+        /// Độ dày nét, pixel canvas.
+        stroke_width: f64,
+        fill: Option<String>,
+    },
+    /// E10 (v1): callout — hộp chữ có đuôi chỉ vào (tail_x, tail_y).
+    #[serde(rename_all = "camelCase")]
+    Callout {
+        text: String,
+        font: String,
+        size_px: f64,
+        color: String,
+        background: String,
+        tail_x: f64,
+        tail_y: f64,
+    },
+    /// E10 (v1): spotlight vùng — làm tối mọi thứ ngoài vùng sáng.
+    #[serde(rename_all = "camelCase")]
+    Spotlight {
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        ellipse: bool,
+        /// 0–1: độ tối phần ngoài.
+        dim: f64,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ShapeKind {
+    Rectangle,
+    Ellipse,
+    Arrow,
+    Line,
 }
 
 impl ClipContent {
     pub fn is_overlay(&self) -> bool {
-        matches!(self, Self::Text { .. } | Self::Blur { .. })
+        matches!(
+            self,
+            Self::Text { .. } | Self::Blur { .. } | Self::Shape { .. } | Self::Callout { .. } | Self::Spotlight { .. }
+        )
     }
 }
 

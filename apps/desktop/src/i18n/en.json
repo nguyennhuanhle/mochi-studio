@@ -17,7 +17,9 @@
     "openProject": "Open project…",
     "recent": "Recent projects",
     "noRecent": "No projects yet.",
-    "newProject": "Blank project"
+    "newProject": "Blank project",
+    "openZip": "Open .zip package…",
+    "unpackFailed": "Couldn't open the package: {{detail}}"
   },
   "record": {
     "title": "Recording setup",
@@ -215,7 +217,9 @@
     "removeTrackLocked": "Track is locked — unlock it to delete",
     "removeTrackTitle": "Delete track {{name}}?",
     "removeTrackBody": "This track has {{count}} clip(s). Deleting the track also deletes them (you can undo with Ctrl+Z).",
-    "removeTrackConfirm": "Delete track and clips"
+    "removeTrackConfirm": "Delete track and clips",
+    "saveFrame": "Save the current frame as a PNG image",
+    "frameSaved": "Image saved: {{path}}"
   },
   "timelineError": {
     "notFound": "Item not found.",
@@ -381,7 +385,9 @@
       "encoder": "Encoder error: {{message}}",
       "cancelled": "Cancelled, no partial file left behind.",
       "crashed": "The export process stopped unexpectedly. Log: {{log}}"
-    }
+    },
+    "audioOnly": "audio only",
+    "summaryAudio": "Audio only · {{secs}} s · about {{size}}"
   },
   "jobs": {
     "proxyQueued": "Waiting to build proxy",
@@ -452,5 +458,54 @@
     "opacity": "Strength",
     "recordHint": "Not shown on screen while recording; appears in the preview and export, and can be changed / turned off later in the editor.",
     "noCursorData": "This recording has no cursor data."
+  },
+  "preset": {
+    "choose": "Choose a preset…",
+    "none": "No presets yet",
+    "save": "Save preset",
+    "saveTitle": "Save as preset",
+    "name": "Preset name",
+    "overwrite": "Overwrite",
+    "exists": "A preset named \"{{name}}\" exists — saving will overwrite it.",
+    "delete": "Delete this preset",
+    "needTarget": "Choose a screen, window or area before saving a preset"
+  },
+  "fx": {
+    "freeze": "Freeze frame",
+    "freezeSecs": "Duration (seconds)",
+    "freezeHere": "Freeze at playhead ({{at}} s)",
+    "freezeOutside": "Move the playhead inside the clip",
+    "extendLast": "Extend last frame",
+    "freezeHint": "Inserts a still segment (silent); later clips on this track move back."
+  },
+  "marker": {
+    "title": "Markers",
+    "empty": "No markers yet. Press M to add a marker at the playhead.",
+    "goto": "Go to marker",
+    "label": "Marker name",
+    "delete": "Delete marker",
+    "hint": "M: add a marker at the playhead. Click ▼ on the ruler to jump to it."
+  },
+  "brand": {
+    "title": "Brand theme",
+    "colors": "Brand colors (shown in every color picker)",
+    "color": "Color {{n}}",
+    "addColor": "+ Color",
+    "removeColor": "Remove this color",
+    "font": "Font for new text",
+    "hint": "Applies to newly added text and to color pickers; existing text is unchanged.",
+    "save": "Save theme"
+  },
+  "pack": {
+    "button": "Package",
+    "hint": "Package the project and all its media into a .zip to move it to another computer",
+    "progress": "Packaging {{pct}}%",
+    "done": "Packaged: {{path}} ({{mb}} MB).",
+    "missing": "Not in the package (missing media): {{names}}",
+    "failed": "Couldn't package the project: {{detail}}"
+  },
+  "update": {
+    "check": "Check for updates",
+    "hint": "Opens the GitHub releases page in your browser (the app itself never connects to the network)."
   }
 }

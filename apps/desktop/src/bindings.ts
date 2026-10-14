@@ -395,6 +395,53 @@ async playerSeek(t: Ticks) : Promise<void> {
 async playerStep(frames: number) : Promise<void> {
     await TAURI_INVOKE("player_step", { frames });
 },
+/**
+ * X08: hộp thoại chọn nơi lưu PNG, rồi lưu khung tại đầu phát. None = người dùng hủy.
+ */
+async playerSaveFrame(defaultName: string) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("player_save_frame", { defaultName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * X07: đóng gói project đang mở + mọi media thành .zip. None = người dùng hủy hộp thoại.
+ */
+async projectPack() : Promise<Result<PackResult | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_pack") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async openReleasesPage() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_releases_page") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Phiên bản app đang chạy (để so với trang Releases).
+ */
+async appVersion() : Promise<string> {
+    return await TAURI_INVOKE("app_version");
+},
+/**
+ * X07: chọn một gói .zip, giải nén cạnh file zip, trả về thư mục project để mở.
+ */
+async projectUnpackPick() : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_unpack_pick") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async exportCapabilities() : Promise<CodecSupport[]> {
     return await TAURI_INVOKE("export_capabilities");
 },
@@ -426,8 +473,8 @@ async exportCancel(jobId: string) : Promise<void> {
 /**
  * Hộp thoại chọn nơi lưu file xuất.
  */
-async exportPickPath(current: string, gif: boolean) : Promise<string | null> {
-    return await TAURI_INVOKE("export_pick_path", { current, gif });
+async exportPickPath(current: string, format: ExportFormat) : Promise<string | null> {
+    return await TAURI_INVOKE("export_pick_path", { current, format });
 },
 /**
  * Thư mục mặc định cho file xuất: thư mục lưu bản quay (Videos\Mochi Studio).
@@ -542,6 +589,7 @@ cacheTrimmed: CacheTrimmed,
 closeSaveFailed: CloseSaveFailed,
 exportEvent: ExportEvent,
 jobsUpdate: JobsUpdate,
+packProgress: PackProgress,
 playerStats: PlayerStats,
 playerTime: PlayerTime,
 recorderEventMsg: RecorderEventMsg,
@@ -552,6 +600,7 @@ cacheTrimmed: "cache-trimmed",
 closeSaveFailed: "close-save-failed",
 exportEvent: "export-event",
 jobsUpdate: "jobs-update",
+packProgress: "pack-progress",
 playerStats: "player-stats",
 playerTime: "player-time",
 recorderEventMsg: "recorder-event-msg",
@@ -568,6 +617,22 @@ regionSelected: "region-selected"
  * Cửa sổ đang active đổi sang `app` / `title` tại giây `at`.
  */
 export type ActiveWindow = { at: number; app: string; title: string }
+/**
+ * E11 (v1): xử lý tiếng của clip (chạy trên máy, kết quả cache trong `cache/`).
+ */
+export type AudioFx = { 
+/**
+ * Khử ồn (RNNoise).
+ */
+denoise: boolean; 
+/**
+ * Chuẩn hóa độ to về −16 LUFS.
+ */
+normalize: boolean; 
+/**
+ * Nén (compressor) cho giọng nói đều hơn.
+ */
+compress: boolean }
 export type AudioInfo = { channels: number; sampleRate: number }
 /**
  * S01: kết quả tự lưu.
@@ -615,6 +680,15 @@ savedAt: string;
  * Bản người dùng tự lưu (Ctrl+S / đóng project), không phải bản tự lưu nền.
  */
 manual: boolean }
+export type BrandTheme = { 
+/**
+ * "#RRGGBB", tối đa 8 màu.
+ */
+colors: string[]; 
+/**
+ * Họ font cho chữ mới (rỗng = font mặc định).
+ */
+font: string }
 export type CacheInfo = { usage: CacheUsage; limitGb: number }
 /**
  * Cache vượt giới hạn → đã xóa proxy cũ nhất (báo nhẹ cho người dùng).
@@ -657,6 +731,32 @@ export type CameraShape = "rounded" | "circle" |
 "source"
 export type Canvas = { width: number; height: number; fps: number }
 /**
+ * E13: một dòng phụ đề. `words` (nếu có) cho phụ đề động hiện từng chữ.
+ */
+export type Caption = { id: string; start: Ticks; end: Ticks; text: string; words?: CaptionWord[] }
+export type CaptionStyle = { 
+/**
+ * Hiện phụ đề trong preview / video xuất (burn-in, X05).
+ */
+visible: boolean; font: string; 
+/**
+ * Cỡ chữ theo % chiều cao canvas (2–10).
+ */
+size: number; color: string; 
+/**
+ * Nền sau chữ; None = không nền.
+ */
+background: string | null; 
+/**
+ * Vị trí theo chiều dọc (0 = trên, 1 = dưới).
+ */
+y: number; 
+/**
+ * Phụ đề động: tô màu từng chữ đang nói.
+ */
+animated: boolean; highlight: string }
+export type CaptionWord = { start: Ticks; end: Ticks; text: string }
+/**
  * Vùng quay (R01). Toạ độ `Area` là toạ độ LOGIC trên màn hình `display_id`, giống Cap.
  */
 export type CaptureTarget = { kind: "display"; id: string } | { kind: "window"; id: string } | { kind: "area"; displayId: string; x: number; y: number; width: number; height: number }
@@ -681,8 +781,44 @@ sourceIn: Ticks; sourceOut: Ticks;
 /**
  * 0.25–4 (E04).
  */
-speed: number; volumeDb: number; fadeIn: Ticks; fadeOut: Ticks; muted: boolean; transform: Transform | null; content: ClipContent }
-export type ClipContent = { type: "recording"; fx?: RecordingFx } | { type: "video" } | { type: "audio" } | { type: "image" } | { type: "text"; text: string; font: string; sizePx: number; color: string; background: string | null } | { type: "blur"; x: number; y: number; width: number; height: number; pixelate: boolean; strength: number }
+speed: number; volumeDb: number; fadeIn: Ticks; fadeOut: Ticks; muted: boolean; transform: Transform | null; content: ClipContent; 
+/**
+ * E04 (v1): freeze frame — clip đứng yên ở thời điểm này trong media (không tiếng).
+ */
+hold?: Ticks | null; 
+/**
+ * E12 (v1): keyframe vị trí / scale / xoay / độ mờ (thời gian tính từ đầu clip). Rỗng = `transform`.
+ */
+keyframes?: Keyframe[]; 
+/**
+ * E12 (v1): chuyển cảnh khi clip vào / ra.
+ */
+transitionIn?: Transition | null; transitionOut?: Transition | null; 
+/**
+ * E15 (v1): màu cơ bản, viền, bo góc, khung thiết bị.
+ */
+look?: Look; 
+/**
+ * E11 (v1): khử ồn, chuẩn hóa độ to, nén.
+ */
+audioFx?: AudioFx; 
+/**
+ * E14 (v1): nhóm — các clip cùng nhóm di chuyển / xóa cùng nhau.
+ */
+group?: string | null }
+export type ClipContent = { type: "recording"; fx?: RecordingFx } | { type: "video" } | { type: "audio" } | { type: "image" } | { type: "text"; text: string; font: string; sizePx: number; color: string; background: string | null } | { type: "blur"; x: number; y: number; width: number; height: number; pixelate: boolean; strength: number } | 
+/**
+ * E10 (v1): hình khối / mũi tên / đường kẻ. (x0, y0) → (x1, y1) chuẩn hóa 0–1 trên canvas.
+ */
+{ type: "shape"; shape: ShapeKind; x0: number; y0: number; x1: number; y1: number; stroke: string; strokeWidth: number; fill: string | null } | 
+/**
+ * E10 (v1): callout — hộp chữ có đuôi chỉ vào (tail_x, tail_y).
+ */
+{ type: "callout"; text: string; font: string; sizePx: number; color: string; background: string; tailX: number; tailY: number } | 
+/**
+ * E10 (v1): spotlight vùng — làm tối mọi thứ ngoài vùng sáng.
+ */
+{ type: "spotlight"; x: number; y: number; width: number; height: number; ellipse: boolean; dim: number }
 /**
  * Đóng cửa sổ chính khi project đang mở chưa lưu được.
  */
@@ -733,6 +869,7 @@ size: number;
  * Độ đậm ở tâm, %: 10–100.
  */
 opacity: number }
+export type DeviceFrame = "none" | "laptop" | "phone" | "browser"
 export type DeviceKind = "microphone" | "camera" | "systemAudio" | "screen"
 export type DeviceList = { 
 /**
@@ -745,6 +882,7 @@ export type DisplayInfo = { id: string; name: string; refreshRate: number; physi
  */
 physicalX: number; physicalY: number }
 export type Duplicate = { path: string; existingMediaId: string }
+export type Easing = "linear" | "easeIn" | "easeOut" | "easeInOut"
 export type Edge = "start" | "end"
 /**
  * Mọi chỉnh sửa timeline. UI gửi đúng một `EditOp` qua lệnh `timeline_apply`.
@@ -763,6 +901,15 @@ export type EditOp = { op: "addTrack"; kind: TrackKind } |
  * Dời các clip đi `delta`; có `track_id` thì chuyển sang track đó.
  */
 { op: "moveClips"; clipIds: string[]; delta: Ticks; trackId: string | null } | { op: "trimClip"; clipId: string; edge: Edge; to: Ticks } | { op: "splitClip"; clipId: string; at: Ticks } | 
+/**
+ * E14 (v1): marker.
+ */
+{ op: "addMarker"; at: Ticks; label: string } | { op: "updateMarker"; markerId: string; at: Ticks | null; label: string | null } | { op: "removeMarker"; markerId: string } | 
+/**
+ * E04 (v1): chèn khung đứng yên dài `duration` tại `at` (timeline) của clip; `at` = cuối clip →
+ * kéo dài frame cuối. Các clip phía sau trên cùng track (và tiếng đã tách của clip đó) dời theo.
+ */
+{ op: "freezeFrame"; clipId: string; at: Ticks; duration: Ticks } | 
 /**
  * `ripple` = dồn các clip phía sau trên cùng track vào chỗ trống.
  */
@@ -850,7 +997,15 @@ export type ExportEventMsg =
  * Tin nhắn từ tiến trình con (started / progress / fallback / done / failed).
  */
 { type: "child"; msg: ChildMsg }
-export type ExportFormat = "mp4" | "gif"
+export type ExportFormat = "mp4" | "gif" | 
+/**
+ * X02 (v1): chỉ âm thanh, AAC trong .m4a.
+ */
+"m4a" | 
+/**
+ * X02 (v1): chỉ âm thanh, MP3 (LAME).
+ */
+"mp3"
 export type ExportJobInfo = { jobId: string; state: JobState; output: string; projectName: string }
 export type ExportQuality = "standard" | "high" | "max"
 export type ExportSettings = { format: ExportFormat; 
@@ -904,6 +1059,7 @@ recordingDir: string; name: string; durationMs: number; segments: number;
  * Ngắn hơn 1 giây → UI hỏi giữ hay bỏ.
  */
 tooShort: boolean }
+export type FxPreset = { name: string; fx: RecordingFx }
 /**
  * Kết quả kiểm GPU lúc khởi động.
  */
@@ -946,15 +1102,47 @@ export type JobStatus = { state: "queued" } | { state: "running"; progress: numb
  */
 export type JobsUpdate = { mediaId: string; status: JobStatus }
 /**
+ * E12: một keyframe. `at` tính từ đầu clip; giữa hai keyframe nội suy theo `easing` của keyframe sau.
+ */
+export type Keyframe = { at: Ticks; x: number; y: number; scale: number; 
+/**
+ * Độ (theo chiều kim đồng hồ).
+ */
+rotation: number; opacity: number; easing: Easing }
+/**
  * K-R3: mặc định không ghi phím. `ModifiersOnly` chỉ giữ tổ hợp có Ctrl/Alt/Win;
  * `All` ghi mọi phím và chỉ bật được sau hộp thoại cảnh báo ở UI.
  */
 export type KeystrokeMode = "off" | "modifiersOnly" | "all"
 /**
+ * E15: chỉnh màu cơ bản + viền + bo góc + khung thiết bị, áp cho mọi clip có hình.
+ */
+export type Look = { 
+/**
+ * −100…100 (0 = giữ nguyên).
+ */
+brightness: number; contrast: number; saturation: number; 
+/**
+ * Độ dày viền, pixel canvas 0–40.
+ */
+borderWidth: number; borderColor: string; 
+/**
+ * Bo góc, % cạnh ngắn của clip 0–50.
+ */
+cornerRadius: number; 
+/**
+ * Đổ bóng 0–100.
+ */
+shadow: number; device: DeviceFrame }
+/**
  * Một nguồn bị mất trong [start, end) giây.
  */
 export type LostRange = { source: LostSource; start: number; end: number }
 export type LostSource = "camera" | "microphone" | "systemAudio"
+/**
+ * E14: marker — một mốc có tên trên timeline (nhảy tới, xuất mỗi marker một file).
+ */
+export type Marker = { id: string; at: Ticks; label: string }
 export type MediaItem = { id: string; kind: MediaKind; name: string; 
 /**
  * Đường dẫn tuyệt đối lúc import.
@@ -985,6 +1173,18 @@ export type MediaTaskError =
  * Điểm chuẩn hóa 0–1 theo khung.
  */
 export type NormPoint = { x: number; y: number }
+/**
+ * X07: tiến độ đóng gói project (byte đã chép / tổng).
+ */
+export type PackProgress = { done: number; total: number }
+/**
+ * Kết quả đóng gói.
+ */
+export type PackResult = { path: string; bytes: number; 
+/**
+ * Tên media không tìm thấy (không có trong gói).
+ */
+missing: string[] }
 export type PlayerStats = { fps: number; renderMs: number }
 /**
  * Vị trí phát (gửi ~30 lần/giây khi đang phát).
@@ -994,7 +1194,15 @@ export type Project = { schemaVersion: number; id: string; name: string; created
 /**
  * Thứ tự = z-order: phần tử đầu ở dưới cùng.
  */
-tracks: Track[]; clips: Clip[] }
+tracks: Track[]; clips: Clip[]; 
+/**
+ * E14 (v1): marker trên timeline.
+ */
+markers?: Marker[]; 
+/**
+ * E13 (v1): phụ đề (thời gian trên timeline).
+ */
+captions?: Caption[]; captionStyle?: CaptionStyle }
 /**
  * Lỗi khi làm việc với gói project. `code` ổn định để UI dịch.
  */
@@ -1147,6 +1355,7 @@ lost?: LostRange[];
  * Cửa sổ đang active theo thời gian (R03).
  */
 activeWindows?: ActiveWindow[] }
+export type RecordingPreset = { name: string; config: RecordingConfig }
 /**
  * Mức chất lượng (bitrate) của bản quay. Chế độ studio luôn quay ở độ phân giải gốc
  * để zoom vẫn nét; độ phân giải đầu ra chọn lúc export (X01).
@@ -1184,7 +1393,20 @@ cacheLimitGb: number;
 /**
  * S03: preview dùng proxy khi có (tắt → luôn đọc file gốc).
  */
-useProxies: boolean }
+useProxies: boolean; 
+/**
+ * R11 (v1): cấu hình quay có tên.
+ */
+recordingPresets: RecordingPreset[]; 
+/**
+ * E14 (v1): preset hiệu ứng bản quay (nền, con trỏ, webcam) có tên.
+ */
+fxPresets: FxPreset[]; 
+/**
+ * E14 (v1): theme thương hiệu — màu gợi ý cho ô màu, font mặc định cho chữ mới.
+ */
+brand: BrandTheme }
+export type ShapeKind = "rectangle" | "ellipse" | "arrow" | "line"
 export type SystemAudioLevel = { 
 /**
  * Tên thiết bị phát mặc định (nguồn của "âm thanh hệ thống").
@@ -1219,12 +1441,34 @@ export type Track = { id: string; kind: TrackKind; name: string; locked: boolean
 /**
  * E11: âm lượng của cả track (dB, cộng với âm lượng từng clip). -60…+12.
  */
-volumeDb?: number }
+volumeDb?: number; 
+/**
+ * E14 (v1): track nam châm — xóa / dời clip thì các clip sau tự dồn lại, không để khoảng trống.
+ */
+magnetic?: boolean; 
+/**
+ * E11 (v1): ducking — track này (nhạc nền) tự nhỏ đi khi các track khác có tiếng nói.
+ */
+duck?: boolean }
 export type TrackKind = "video" | "audio" | "overlay"
 /**
  * Biến đổi tĩnh ở MVP (keyframe ở v1). x, y: tâm theo tỉ lệ canvas (0.5 = giữa).
  */
-export type Transform = { x: number; y: number; scale: number; opacity: number }
+export type Transform = { x: number; y: number; scale: number; opacity: number; 
+/**
+ * E12 (v1): xoay, độ (theo chiều kim đồng hồ).
+ */
+rotation?: number }
+/**
+ * E12: chuyển cảnh. Ở đầu clip mà ngay trước có clip khác trên cùng track → chuyển giữa hai clip;
+ * không có → hiện dần từ lớp bên dưới. Ở cuối clip → ẩn dần.
+ */
+export type Transition = { kind: TransitionKind; duration: Ticks }
+export type TransitionKind = "fade" | "fadeBlack" | "slideLeft" | "slideRight" | "slideUp" | "slideDown" | "wipeLeft" | "wipeRight" | "zoom" | 
+/**
+ * Chỉ cho chữ / callout: hiện từng ký tự.
+ */
+"typewriter"
 export type VideoCodec = "h264" | "hevc" | "av1"
 export type VideoInfo = { width: number; height: number; fps: number }
 export type WindowInfo = { id: string; app: string; title: string; 

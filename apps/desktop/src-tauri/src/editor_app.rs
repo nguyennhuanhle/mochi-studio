@@ -650,6 +650,113 @@ pub fn player_seek(state: State<'_, EditorAppState>, t: Ticks) {
     state.player_send(PlayerCommand::Seek(t));
 }
 
+/// Bài tự kiểm (chỉ bản dev, `test_env`): bỏ qua hộp thoại lưu / mở, dùng thẳng `<dir>/<name>`.
+fn test_dialog_path(name: &str) -> Option<PathBuf> {
+    mochi_project::test_env("MOCHI_TEST_DIALOG_DIR").map(|d| PathBuf::from(d).join(name))
+}
+
+/// X07: tiến độ đóng gói project (byte đã chép / tổng).
+#[derive(Debug, Clone, Serialize, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct PackProgress {
+    #[specta(type = f64)]
+    pub done: u64,
+    #[specta(type = f64)]
+    pub total: u64,
+}
+
+/// X07: đóng gói project đang mở + mọi media thành .zip. None = người dùng hủy hộp thoại.
+#[tauri::command]
+#[specta::specta]
+pub async fn project_pack(app: AppHandle) -> Result<Option<mochi_project::bundle::PackResult>, String> {
+    let state = app.state::<EditorAppState>();
+    let (project, dir) = state
+        .with_session(|s| (s.project().clone(), s.dir().to_path_buf()))
+        .ok_or("chưa mở project")?;
+    let settings = app.state::<crate::settings::SettingsState>();
+    let root = crate::recorder_app::output_root(&app, &settings);
+    let out = match test_dialog_path(&format!("{}.zip", project.name)) {
+        Some(p) => Some(p),
+        None => {
+            let mut dialog = app.dialog().file().add_filter("ZIP", &["zip"]).set_file_name(format!("{}.zip", project.name));
+            if root.is_dir() {
+                dialog = dialog.set_directory(root);
+            }
+            dialog.blocking_save_file().and_then(|f| f.into_path().ok())
+        }
+    };
+    let Some(out) = out else {
+        return Ok(None);
+    };
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut last = std::time::Instant::now();
+        mochi_project::bundle::pack(
+            &project,
+            &dir,
+            |m| mochi_project::media::resolve(&dir, m),
+            &out,
+            |done, total| {
+                if last.elapsed() > Duration::from_millis(150) || done == total {
+                    last = std::time::Instant::now();
+                    let _ = PackProgress { done, total }.emit(&handle);
+                }
+            },
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(Some)
+    .map_err(|e| e.to_string())
+}
+
+/// X07: chọn một gói .zip, giải nén cạnh file zip, trả về thư mục project để mở.
+#[tauri::command]
+#[specta::specta]
+pub async fn project_unpack_pick(app: AppHandle) -> Result<Option<PathBuf>, String> {
+    let picked = match mochi_project::test_env("MOCHI_TEST_DIALOG_PICK") {
+        Some(p) => Some(PathBuf::from(p)),
+        None => app.dialog().file().add_filter("ZIP", &["zip"]).blocking_pick_file().and_then(|f| f.into_path().ok()),
+    };
+    let Some(zip) = picked else {
+        return Ok(None);
+    };
+    let parent = zip.parent().map(std::path::Path::to_path_buf).ok_or("đường dẫn không hợp lệ")?;
+    tauri::async_runtime::spawn_blocking(move || mochi_project::bundle::unpack(&zip, &parent))
+        .await
+        .map_err(|e| e.to_string())?
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+
+/// X08: hộp thoại chọn nơi lưu PNG, rồi lưu khung tại đầu phát. None = người dùng hủy.
+#[tauri::command]
+#[specta::specta]
+pub async fn player_save_frame(app: AppHandle, default_name: String) -> Result<Option<PathBuf>, String> {
+    let settings = app.state::<crate::settings::SettingsState>();
+    let dir = crate::recorder_app::output_root(&app, &settings);
+    let path = match test_dialog_path(&default_name) {
+        Some(p) => Some(p),
+        None => {
+            let mut dialog = app.dialog().file().add_filter("PNG", &["png"]).set_file_name(default_name);
+            if dir.is_dir() {
+                dialog = dialog.set_directory(dir);
+            }
+            dialog.blocking_save_file().and_then(|f| f.into_path().ok())
+        }
+    };
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.state::<EditorAppState>().player_send(PlayerCommand::Snapshot { path: path.clone(), done: tx });
+    tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(120)))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|_| "trình phát không phản hồi".to_string())??;
+    Ok(Some(path))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn player_step(state: State<'_, EditorAppState>, frames: i32) {

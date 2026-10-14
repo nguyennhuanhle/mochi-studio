@@ -60,8 +60,10 @@ export default function ExportDialog(props: {
 
   // Đuôi file theo định dạng.
   useEffect(() => {
-    setOutput((o) => (o ? o.replace(/\.(mp4|gif)$/i, "") + (format === "gif" ? ".gif" : ".mp4") : o));
+    setOutput((o) => (o ? o.replace(/\.(mp4|gif|m4a|mp3)$/i, "") + `.${format}` : o));
   }, [format]);
+
+  const audioOnly = format === "m4a" || format === "mp3";
 
   function applyPreset(p: Preset) {
     setPreset(p);
@@ -151,6 +153,9 @@ export default function ExportDialog(props: {
         <select value={format} onChange={(e) => (setFormat(e.target.value as ExportFormat), setPreset("custom"))}>
           <option value="mp4">MP4</option>
           <option value="gif">GIF</option>
+          {/* X02 (v1): chỉ âm thanh. */}
+          <option value="m4a">M4A ({t("export.audioOnly")})</option>
+          <option value="mp3">MP3 ({t("export.audioOnly")})</option>
         </select>
 
         {format === "mp4" && (
@@ -171,23 +176,27 @@ export default function ExportDialog(props: {
           </>
         )}
 
-        <span>{t("export.resolution")}</span>
-        <select value={shortSide} onChange={(e) => (setShortSide(Number(e.target.value)), setPreset("custom"))}>
-          {SHORT_SIDES.map((s) => (
-            <option key={s} value={s}>
-              {s}p
-            </option>
-          ))}
-        </select>
+        {!audioOnly && (
+          <>
+            <span>{t("export.resolution")}</span>
+            <select value={shortSide} onChange={(e) => (setShortSide(Number(e.target.value)), setPreset("custom"))}>
+              {SHORT_SIDES.map((s) => (
+                <option key={s} value={s}>
+                  {s}p
+                </option>
+              ))}
+            </select>
 
-        <span>{t("export.fps")}</span>
-        <select value={fps} onChange={(e) => (setFps(Number(e.target.value)), setPreset("custom"))}>
-          {(format === "gif" ? GIF_FPS : MP4_FPS).map((f) => (
-            <option key={f} value={f}>
-              {f} fps
-            </option>
-          ))}
-        </select>
+            <span>{t("export.fps")}</span>
+            <select value={fps} onChange={(e) => (setFps(Number(e.target.value)), setPreset("custom"))}>
+              {(format === "gif" ? GIF_FPS : MP4_FPS).map((f) => (
+                <option key={f} value={f}>
+                  {f} fps
+                </option>
+              ))}
+            </select>
+          </>
+        )}
 
         <span>{t("export.quality")}</span>
         <select value={quality} onChange={(e) => (setQuality(e.target.value as ExportQuality), setPreset("custom"))}>
@@ -211,7 +220,7 @@ export default function ExportDialog(props: {
           <input type="text" value={output} onChange={(e) => setOutput(e.target.value)} spellCheck={false} />
           <button
             onClick={async () => {
-              const p = await commands.exportPickPath(output, format === "gif");
+              const p = await commands.exportPickPath(output, format);
               if (p) setOutput(p);
             }}
           >
@@ -225,13 +234,15 @@ export default function ExportDialog(props: {
         {ok && (
           <>
             <div>
-              {t("export.summary", {
-                w: ok.width,
-                h: ok.height,
-                frames: ok.frames,
-                secs: ok.durationSecs.toFixed(1),
-                size: formatBytes(ok.bytes),
-              })}
+              {audioOnly
+                ? t("export.summaryAudio", { secs: ok.durationSecs.toFixed(1), size: formatBytes(ok.bytes) })
+                : t("export.summary", {
+                    w: ok.width,
+                    h: ok.height,
+                    frames: ok.frames,
+                    secs: ok.durationSecs.toFixed(1),
+                    size: formatBytes(ok.bytes),
+                  })}
               {ok.encoder && <span className="muted"> · {ok.encoder}</span>}
             </div>
             {ok.warnings.length > 0 && (

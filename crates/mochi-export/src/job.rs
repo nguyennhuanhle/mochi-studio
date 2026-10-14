@@ -107,6 +107,8 @@ pub async fn run(job: &ExportJob, cancel: &AtomicBool, on_msg: &mut dyn FnMut(Ch
     let result = match s.format {
         ExportFormat::Gif => ctx.gif(&partial).await.map(|()| "gifski".to_string()),
         ExportFormat::Mp4 => ctx.mp4_with_fallback(&partial).await,
+        ExportFormat::M4a => ctx.audio_only(&partial, false).await,
+        ExportFormat::Mp3 => ctx.audio_only(&partial, true).await,
     };
     let encoder = match result {
         Ok(e) => e,
@@ -277,6 +279,80 @@ impl Ctx<'_> {
         }
         out.write_trailer().map_err(ExportError::internal)?;
         Ok(())
+    }
+
+    /// X02 (v1): chỉ xuất âm thanh — cùng bộ trộn với MP4 / preview (OfflineMixer).
+    async fn audio_only(&mut self, partial: &Path, mp3: bool) -> Result<String, ExportError> {
+        use ffmpeg::format::{Sample, sample::Type};
+        let dir = partial.parent().unwrap_or(Path::new(".")).to_path_buf();
+        let mixer = OfflineMixer::new(Arc::new(self.job.project.clone()), &self.job.paths);
+        let (fmt, codec_name) = if mp3 { ("mp3", "libmp3lame") } else { ("ipod", "aac") };
+        let mut out = ffmpeg::format::output_as(partial, fmt).map_err(|e| ExportError::NotWritable { dir: dir.clone() }.log(e))?;
+        let codec = ffmpeg::encoder::find_by_name(codec_name)
+            .ok_or_else(|| ExportError::internal(format!("không có encoder {codec_name}")))?;
+        let global = out.format().flags().contains(ffmpeg::format::Flags::GLOBAL_HEADER);
+        let rate = OfflineMixer::RATE;
+        let mut enc = ffmpeg::codec::context::Context::new_with_codec(codec).encoder().audio().map_err(ExportError::internal)?;
+        enc.set_rate(rate as i32);
+        enc.set_channel_layout(ffmpeg::ChannelLayout::STEREO);
+        enc.set_format(Sample::F32(Type::Planar));
+        enc.set_bit_rate(crate::preflight::audio_bitrate(self.job.settings.quality) as usize);
+        enc.set_time_base((1, rate as i32));
+        if global {
+            enc.set_flags(ffmpeg::codec::Flags::GLOBAL_HEADER);
+        }
+        let mut enc = enc.open_as(codec).map_err(ExportError::internal)?;
+        let stream_index = {
+            let mut st = out.add_stream(codec).map_err(ExportError::internal)?;
+            st.set_parameters(&enc);
+            st.set_time_base((1, rate as i32));
+            st.index()
+        };
+        out.write_header().map_err(ExportError::internal)?;
+        let stream_tb = out.stream(stream_index).map(|s| s.time_base()).unwrap_or((1, rate as i32).into());
+        let encoder = codec_name.to_string();
+        (self.on_msg)(ChildMsg::Started { encoder: encoder.clone(), hardware: false, width: 0, height: 0, frames: self.frames });
+
+        let total = ((self.range.end.0 - self.range.start.0) / OfflineMixer::TICKS_PER_SAMPLE).max(0) as u64;
+        let chunk = enc.frame_size().max(1024) as u64;
+        let mut pcm = Vec::new();
+        let started = Instant::now();
+        let mut last = Instant::now() - Duration::from_secs(1);
+        let mut write_packets = |enc: &mut ffmpeg::encoder::Audio, out: &mut ffmpeg::format::context::Output| -> Result<(), ExportError> {
+            let mut pkt = ffmpeg::Packet::empty();
+            while enc.receive_packet(&mut pkt).is_ok() {
+                pkt.set_stream(stream_index);
+                pkt.rescale_ts((1, rate as i32), stream_tb);
+                pkt.write_interleaved(out).map_err(ExportError::internal)?;
+            }
+            Ok(())
+        };
+        let mut s0 = 0u64;
+        while s0 < total {
+            let n = chunk.min(total - s0) as usize;
+            let frame_i = (s0 * self.job.settings.fps as u64 / rate as u64) as u32;
+            self.check(frame_i, &dir, std::fs::metadata(partial).map(|m| m.len()).unwrap_or(0))?;
+            pcm.resize(n * 2, 0.0);
+            mixer.fill(Ticks(self.range.start.0 + s0 as i64 * OfflineMixer::TICKS_PER_SAMPLE), &mut pcm);
+            let mut frame = ffmpeg::frame::Audio::new(Sample::F32(Type::Planar), chunk as usize, ffmpeg::ChannelLayout::STEREO);
+            frame.set_rate(rate);
+            frame.set_samples(n);
+            for ch in 0..2 {
+                let plane = frame.data_mut(ch);
+                for (k, dst) in plane.chunks_exact_mut(4).take(n).enumerate() {
+                    dst.copy_from_slice(&pcm[k * 2 + ch].to_ne_bytes());
+                }
+            }
+            frame.set_pts(Some(s0 as i64));
+            enc.send_frame(&frame).map_err(ExportError::internal)?;
+            write_packets(&mut enc, &mut out)?;
+            s0 += n as u64;
+            self.progress(frame_i.min(self.frames.saturating_sub(1)), started, &mut last);
+        }
+        enc.send_eof().map_err(ExportError::internal)?;
+        write_packets(&mut enc, &mut out)?;
+        out.write_trailer().map_err(ExportError::internal)?;
+        Ok(encoder)
     }
 
     async fn gif(&mut self, partial: &Path) -> Result<(), ExportError> {

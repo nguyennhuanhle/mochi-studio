@@ -219,7 +219,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Export { project, out, format, codec, short, fps, range, overwrite } => {
             let (p, paths) = export_cmd::load(&project)?;
             let mut s = export_cmd::settings(&out);
-            s.format = if format == "gif" { mochi_export::ExportFormat::Gif } else { mochi_export::ExportFormat::Mp4 };
+            s.format = match format.as_str() {
+                "gif" => mochi_export::ExportFormat::Gif,
+                "m4a" => mochi_export::ExportFormat::M4a,
+                "mp3" => mochi_export::ExportFormat::Mp3,
+                _ => mochi_export::ExportFormat::Mp4,
+            };
             s.codec = match codec.as_str() {
                 "hevc" => mochi_export::VideoCodec::Hevc,
                 "av1" => mochi_export::VideoCodec::Av1,

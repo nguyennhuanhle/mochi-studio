@@ -42,7 +42,7 @@ pub async fn run(secs: f64, project: Option<PathBuf>) -> anyhow::Result<()> {
     let logo_clip = s.project().clips.iter().find(|c| c.media_id.as_deref() == Some(ids[1].as_str())).unwrap().id.clone();
     s.apply(&EditOp::SetClipTransform {
         clip_id: logo_clip,
-        transform: mochi_project::Transform { x: 0.85, y: 0.2, scale: 0.25, opacity: 0.9 },
+        transform: mochi_project::Transform { x: 0.85, y: 0.2, scale: 0.25, opacity: 0.9, rotation: 0.0 },
     }).map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let project = Arc::new(s.project().clone());
     let paths: HashMap<String, PathBuf> = project

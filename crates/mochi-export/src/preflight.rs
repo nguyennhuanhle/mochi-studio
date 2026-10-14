@@ -52,6 +52,7 @@ pub fn estimate_bytes(s: &ExportSettings, w: u32, h: u32, frames: u32, has_audio
             let a = if has_audio { AUDIO_BITRATE as f64 } else { 0.0 };
             ((v + a) * secs / 8.0) as u64
         }
+        ExportFormat::M4a | ExportFormat::Mp3 => (audio_bitrate(s.quality) as f64 * secs / 8.0) as u64,
         // gifski trên nội dung màn hình: ~0,12 byte/điểm ảnh/frame ở chất lượng cao.
         ExportFormat::Gif => {
             let bpp = match s.quality {
@@ -61,6 +62,15 @@ pub fn estimate_bytes(s: &ExportSettings, w: u32, h: u32, frames: u32, has_audio
             };
             (w as f64 * h as f64 * frames as f64 * bpp) as u64
         }
+    }
+}
+
+/// X02: bitrate âm thanh khi xuất chỉ âm thanh.
+pub fn audio_bitrate(q: ExportQuality) -> u64 {
+    match q {
+        ExportQuality::Standard => 128_000,
+        ExportQuality::High => 192_000,
+        ExportQuality::Max => 320_000,
     }
 }
 

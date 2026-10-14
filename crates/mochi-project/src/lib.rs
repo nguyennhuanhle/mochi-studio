@@ -6,6 +6,7 @@ pub mod media;
 mod model;
 pub mod package;
 pub mod sidecar;
+pub mod bundle;
 
 pub use error::{BackupInfo, ProjectError};
 pub use model::*;
@@ -39,6 +40,8 @@ pub fn new_project(name: &str) -> Project {
                 muted: false,
                 hidden: false,
                 volume_db: 0.0,
+                magnetic: false,
+                duck: false,
             },
             Track {
                 id: uuid::Uuid::new_v4().to_string(),
@@ -48,8 +51,13 @@ pub fn new_project(name: &str) -> Project {
                 muted: false,
                 hidden: false,
                 volume_db: 0.0,
+                magnetic: false,
+                duck: false,
             },
         ],
         clips: vec![],
+        markers: vec![],
+        captions: vec![],
+        caption_style: Default::default(),
     }
 }

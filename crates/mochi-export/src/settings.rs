@@ -9,6 +9,17 @@ use std::path::{Path, PathBuf};
 pub enum ExportFormat {
     Mp4,
     Gif,
+    /// X02 (v1): chỉ âm thanh, AAC trong .m4a.
+    #[serde(rename = "m4a")]
+    M4a,
+    /// X02 (v1): chỉ âm thanh, MP3 (LAME).
+    Mp3,
+}
+
+impl ExportFormat {
+    pub fn is_audio_only(self) -> bool {
+        matches!(self, Self::M4a | Self::Mp3)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, specta::Type)]
@@ -131,5 +142,7 @@ pub fn with_format_extension(output: &Path, format: ExportFormat) -> PathBuf {
     output.with_extension(match format {
         ExportFormat::Mp4 => "mp4",
         ExportFormat::Gif => "gif",
+        ExportFormat::M4a => "m4a",
+        ExportFormat::Mp3 => "mp3",
     })
 }

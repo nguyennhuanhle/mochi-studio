@@ -54,6 +54,17 @@ pub enum EditOp {
     TrimClip { clip_id: String, edge: Edge, to: Ticks },
     #[serde(rename_all = "camelCase")]
     SplitClip { clip_id: String, at: Ticks },
+    /// E14 (v1): marker.
+    #[serde(rename_all = "camelCase")]
+    AddMarker { at: Ticks, label: String },
+    #[serde(rename_all = "camelCase")]
+    UpdateMarker { marker_id: String, at: Option<Ticks>, label: Option<String> },
+    #[serde(rename_all = "camelCase")]
+    RemoveMarker { marker_id: String },
+    /// E04 (v1): chèn khung đứng yên dài `duration` tại `at` (timeline) của clip; `at` = cuối clip →
+    /// kéo dài frame cuối. Các clip phía sau trên cùng track (và tiếng đã tách của clip đó) dời theo.
+    #[serde(rename_all = "camelCase")]
+    FreezeFrame { clip_id: String, at: Ticks, duration: Ticks },
     /// `ripple` = dồn các clip phía sau trên cùng track vào chỗ trống.
     #[serde(rename_all = "camelCase")]
     DeleteClips { clip_ids: Vec<String>, ripple: bool },
@@ -187,6 +198,32 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
         }
         EditOp::TrimClip { clip_id, edge, to } => trim(p, clip_id, *edge, *to)?,
         EditOp::SplitClip { clip_id, at } => split(p, clip_id, *at)?,
+        EditOp::FreezeFrame { clip_id, at, duration } => freeze(p, clip_id, *at, *duration)?,
+        EditOp::AddMarker { at, label } => {
+            p.markers.push(mochi_project::Marker {
+                id: uuid::Uuid::new_v4().to_string(),
+                at: (*at).max(Ticks::ZERO),
+                label: marker_label(label),
+            });
+            p.markers.sort_by_key(|m| m.at);
+        }
+        EditOp::UpdateMarker { marker_id, at, label } => {
+            let m = p.markers.iter_mut().find(|m| &m.id == marker_id).ok_or_else(|| not_found("marker"))?;
+            if let Some(at) = at {
+                m.at = (*at).max(Ticks::ZERO);
+            }
+            if let Some(l) = label {
+                m.label = marker_label(l);
+            }
+            p.markers.sort_by_key(|m| m.at);
+        }
+        EditOp::RemoveMarker { marker_id } => {
+            let before = p.markers.len();
+            p.markers.retain(|m| &m.id != marker_id);
+            if p.markers.len() == before {
+                return Err(not_found("marker"));
+            }
+        }
         EditOp::DeleteClips { clip_ids, ripple } => delete(p, clip_ids, *ripple)?,
         EditOp::SetClipSpeed { clip_id, speed } => {
             ensure_clip_unlocked(p, clip_id)?;
@@ -225,6 +262,7 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
                 y: transform.y.clamp(-1.0, 2.0),
                 scale: transform.scale.clamp(0.05, 10.0),
                 opacity: transform.opacity.clamp(0.0, 1.0),
+                rotation: if transform.rotation.is_finite() { transform.rotation.clamp(-3600.0, 3600.0) } else { 0.0 },
             });
         }
         EditOp::SetRecordingFx { clip_id, fx } => {
@@ -336,8 +374,15 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
                 fade_in: Ticks::ZERO,
                 fade_out: Ticks::ZERO,
                 muted: false,
-                transform: is_text.then_some(Transform { x: 0.5, y: 0.85, scale: 1.0, opacity: 1.0 }),
+                transform: is_text.then_some(Transform { x: 0.5, y: 0.85, scale: 1.0, opacity: 1.0, rotation: 0.0 }),
                 content: sanitize_overlay(content.clone()),
+                hold: None,
+                keyframes: vec![],
+                transition_in: None,
+                transition_out: None,
+                look: Default::default(),
+                audio_fx: Default::default(),
+                group: None,
             });
         }
         EditOp::SetOverlay { clip_id, content } => {
@@ -495,6 +540,13 @@ fn add_clip(p: &mut Project, media_id: &str, track_id: Option<&str>, start: Tick
         muted: false,
         transform: None,
         content: content.clone(),
+        hold: None,
+        keyframes: vec![],
+        transition_in: None,
+        transition_out: None,
+        look: Default::default(),
+        audio_fx: Default::default(),
+        group: None,
     };
 
     if let Some(tid) = track_id {
@@ -644,6 +696,59 @@ fn delete(p: &mut Project, ids: &[String], ripple: bool) -> Result<(), TimelineE
     Ok(())
 }
 
+/// Tên marker: bỏ khoảng trắng thừa, tối đa 80 ký tự, rỗng → "Marker".
+fn marker_label(l: &str) -> String {
+    let l: String = l.trim().chars().take(80).collect();
+    if l.is_empty() { "Marker".into() } else { l }
+}
+
+/// E04: freeze frame / kéo dài frame cuối.
+fn freeze(p: &mut Project, clip_id: &str, at: Ticks, duration: Ticks) -> Result<(), TimelineError> {
+    ensure_clip_unlocked(p, clip_id)?;
+    let c = clip(p, clip_id)?.clone();
+    if !matches!(c.content, ClipContent::Recording { .. } | ClipContent::Video) || c.hold.is_some() {
+        return Err(TimelineError::Invalid { detail: "chỉ freeze được clip video / bản quay".into() });
+    }
+    if at < c.start || at > c.end() {
+        return Err(TimelineError::Invalid { detail: "đầu phát nằm ngoài clip".into() });
+    }
+    let duration = Ticks(duration.0.clamp(MIN_CLIP.0, Ticks::from_secs(600.0).0));
+    // Khung giữ lại: tại đầu phát, hoặc frame cuối (lùi 1/60 s) nếu ở cuối clip.
+    let last = Ticks((c.source_out.0 - MIN_CLIP.0).max(c.source_in.0));
+    let held = if at >= c.end() { last } else { Ticks(c.source_time_at(at).0.min(last.0)) };
+    if at > c.start && at < c.end() {
+        split(p, clip_id, at)?;
+    }
+    // Dời mọi clip sau `at` trên cùng track + tiếng đã tách của cùng media trên track tiếng.
+    let detached: Vec<String> = p
+        .tracks
+        .iter()
+        .filter(|t| t.kind == TrackKind::Audio && !t.locked)
+        .map(|t| t.id.clone())
+        .collect();
+    for other in p.clips.iter_mut() {
+        let same_track = other.track_id == c.track_id;
+        let its_audio = c.media_id.is_some() && other.media_id == c.media_id && detached.contains(&other.track_id);
+        if (same_track || its_audio) && other.start >= at {
+            other.start = other.start + duration;
+        }
+    }
+    let mut still = c.clone();
+    still.id = uuid::Uuid::new_v4().to_string();
+    still.start = at;
+    still.source_in = held;
+    still.source_out = held + duration;
+    still.speed = 1.0;
+    still.hold = Some(held);
+    still.keyframes.clear();
+    still.transition_in = None;
+    still.transition_out = None;
+    still.fade_in = Ticks::ZERO;
+    still.fade_out = Ticks::ZERO;
+    p.clips.push(still);
+    Ok(())
+}
+
 // ---------- tiện ích ----------
 
 fn new_track(kind: TrackKind, name: String) -> Track {
@@ -655,6 +760,8 @@ fn new_track(kind: TrackKind, name: String) -> Track {
         muted: false,
         hidden: false,
         volume_db: 0.0,
+        magnetic: false,
+        duck: false,
     }
 }
 
@@ -759,6 +866,29 @@ mod tests {
         let p = crate::apply(&p, &EditOp::ApplyRecordingFxToAll { clip_id: b }).unwrap();
         assert!(fx_of(&p, "a").iter().all(|f| f.background.kind == BackgroundKind::None && f.zoom.segments.is_empty()));
         assert_eq!(fx_of(&p, "b")[0].zoom.segments.len(), 1);
+    }
+
+    #[test]
+    fn freeze_frame_inserts_a_silent_still_and_shifts_later_clips() {
+        let p = project();
+        // Clip "a" đã bị cắt ở 4 s: a1 [0,4) a2 [4,10), "b" [10,20).
+        let a1 = p.clips.iter().find(|c| c.media_id.as_deref() == Some("a") && c.start == Ticks::ZERO).unwrap().id.clone();
+        let p = crate::apply(&p, &EditOp::FreezeFrame { clip_id: a1.clone(), at: Ticks::from_secs(2.0), duration: Ticks::from_secs(3.0) }).unwrap();
+        let still = p.clips.iter().find(|c| c.hold.is_some()).unwrap();
+        assert_eq!(still.start, Ticks::from_secs(2.0));
+        assert_eq!(still.duration(), Ticks::from_secs(3.0));
+        assert_eq!(still.hold, Some(Ticks::from_secs(2.0)));
+        // Mọi khung trong freeze đều là giây thứ 2 của media.
+        assert_eq!(still.source_time_at(Ticks::from_secs(4.5)), Ticks::from_secs(2.0));
+        let b = p.clips.iter().find(|c| c.media_id.as_deref() == Some("b")).unwrap();
+        assert_eq!(b.start, Ticks::from_secs(13.0));
+        // Kéo dài frame cuối của "b".
+        let b_id = b.id.clone();
+        let end = b.end();
+        let p = crate::apply(&p, &EditOp::FreezeFrame { clip_id: b_id, at: end, duration: Ticks::from_secs(1.0) }).unwrap();
+        let tail = p.clips.iter().filter(|c| c.hold.is_some()).max_by_key(|c| c.start).unwrap();
+        assert_eq!(tail.start, end);
+        assert!(tail.hold.unwrap() < Ticks::from_secs(10.0));
     }
 
     #[test]

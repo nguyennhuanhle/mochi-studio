@@ -15,6 +15,7 @@ anyhow = { workspace = true }
 cpal = { workspace = true }
 raw-window-handle = "0.6"
 tokio = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }
 tracing = { workspace = true }
 wgpu = { workspace = true }
 

@@ -228,6 +228,21 @@ export default function Timeline(props: {
             )}
             {props.inOut.start !== null && <div className="tl-inout-mark in" style={{ left: x(props.inOut.start) }} />}
             {props.inOut.end !== null && <div className="tl-inout-mark out" style={{ left: x(props.inOut.end) }} />}
+            {/* E14: marker — bấm để nhảy tới. */}
+            {(p.markers ?? []).map((m) => (
+              <button
+                key={m.id}
+                className="tl-marker"
+                style={{ left: x(m.at) }}
+                title={`${m.label} · ${formatTimecode(m.at)}`}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  props.onSeek(m.at);
+                }}
+              >
+                ▼
+              </button>
+            ))}
             {marks.map((s) => (
               <span key={s} className="tl-mark" style={{ left: s * pxPerSec }}>
                 {formatTimecode(ticks(s)).replace(/\.00$/, "")}
@@ -277,6 +292,7 @@ export default function Timeline(props: {
                         <img className="tl-thumb" src={props.thumbs[media.id]!} alt="" draggable={false} />
                       )}
                       <span className="tl-clip-name">
+                        {c.hold != null && <span title={t("fx.freeze")}>❄ </span>}
                         {c.content.type === "text"
                           ? `T  ${c.content.text}`
                           : c.content.type === "blur"
@@ -348,7 +364,8 @@ export default function Timeline(props: {
                 </div>
                 <div className="tl-lane tl-zoom-lane" style={{ width: contentW }}>
                   {recClips.flatMap((c) =>
-                    c.content.type === "recording" && c.content.fx
+                    // Freeze frame (E04): khung đứng yên, zoom không chạy → không vẽ khối zoom.
+                    c.content.type === "recording" && c.content.fx && c.hold == null
                       ? c.content.fx.zoom.segments.map((z) => {
                           const a = Math.max(c.start + (z.start - c.sourceIn) / c.speed, c.start);
                           const b = Math.min(c.start + (z.end - c.sourceIn) / c.speed, clipEnd(c));

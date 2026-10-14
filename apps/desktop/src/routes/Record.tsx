@@ -11,6 +11,8 @@ import {
   type HotkeyConflict,
   type KeystrokeMode,
   type RecorderError,
+  type RecordingConfig,
+  type RecordingPreset,
   type RecordingQuality,
   type Settings,
   type WindowInfo,
@@ -20,6 +22,7 @@ import { useCameraPreview, useMicLevel, useSystemAudioLevel } from "../lib/media
 import Dialog from "../components/Dialog";
 import HotkeysDialog from "../components/HotkeysDialog";
 import GpuWarning from "../components/GpuWarning";
+import PresetBar from "../components/PresetBar";
 import HighlightControls, { DEFAULT_HIGHLIGHT } from "../components/HighlightControls";
 
 type AreaField = "x" | "y" | "width" | "height";
@@ -107,18 +110,7 @@ export default function Record() {
       setAreaDisplay(ds[0]?.id ?? "");
       const last = s.lastRecording;
       if (last) {
-        setTab(last.target.kind);
-        if (last.target.kind === "area") setAreaDisplay(last.target.displayId);
-        setTarget(last.target);
-        setMic(last.mic && dv.mics.includes(last.mic) ? last.mic : null);
-        setCamera(last.camera && dv.cameras.some((c) => c.id === last.camera) ? last.camera : null);
-        setSystemAudio(last.systemAudio);
-        setFps(last.fps);
-        setQuality(last.quality);
-        setCountdown(last.countdownSecs);
-        setKeystrokes(last.keystrokes);
-        if (last.cursorHighlight) setHighlight(last.cursorHighlight);
-        setFrame(last.frame ?? true);
+        applyConfig(last, dv);
       } else if (ds[0]) {
         setTarget({ kind: "display", id: ds[0].id });
         setCountdown(s.countdownSecs);
@@ -130,6 +122,46 @@ export default function Record() {
       }
     })();
   }, []);
+
+  /** R11: áp một cấu hình quay (lần trước hoặc preset). Thiết bị không còn → bỏ chọn. */
+  function applyConfig(c: RecordingConfig, dv: typeof devices = devices) {
+    setTab(c.target.kind);
+    if (c.target.kind === "area") setAreaDisplay(c.target.displayId);
+    setTarget(c.target);
+    setMic(c.mic && dv?.mics.includes(c.mic) ? c.mic : null);
+    setCamera(c.camera && dv?.cameras.some((x) => x.id === c.camera) ? c.camera : null);
+    setSystemAudio(c.systemAudio);
+    setFps(c.fps);
+    setQuality(c.quality);
+    setCountdown(c.countdownSecs);
+    setKeystrokes(c.keystrokes);
+    if (c.cursorHighlight) setHighlight(c.cursorHighlight);
+    setFrame(c.frame ?? true);
+  }
+
+  /** Cấu hình đang chọn trên màn hình (dùng để bắt đầu quay và lưu preset). */
+  function currentConfig(): RecordingConfig | null {
+    if (!target || !settings?.outputRoot) return null;
+    return {
+      target,
+      mic,
+      camera,
+      systemAudio,
+      fps,
+      quality,
+      countdownSecs: countdown,
+      keystrokes,
+      outputRoot: settings.outputRoot,
+      cursorHighlight: highlight,
+      frame,
+    };
+  }
+
+  async function savePresets(next: RecordingPreset[]) {
+    const s = await commands.settingsGet();
+    const saved = await commands.settingsSet({ ...s, recordingPresets: next });
+    setSettings(saved.status === "ok" ? saved.data : { ...s, recordingPresets: next });
+  }
 
   useEffect(() => {
     const un = events.regionSelected.listen((e) => {
@@ -158,19 +190,7 @@ export default function Record() {
     // Nhả webcam/mic của phần xem trước để pipeline quay mở được thiết bị.
     cam.release();
     micLevel.release();
-    const res = await commands.recorderStart({
-      target,
-      mic,
-      camera,
-      systemAudio,
-      fps,
-      quality,
-      countdownSecs: countdown,
-      keystrokes,
-      outputRoot: settings.outputRoot,
-      cursorHighlight: highlight,
-      frame,
-    });
+    const res = await commands.recorderStart(currentConfig()!);
     setStarting(false);
     if (res.status === "error") setError(res.error);
   }
@@ -189,6 +209,21 @@ export default function Record() {
           ←
         </Link>
         <h2 style={{ margin: 0 }}>{t("record.title")}</h2>
+        <span style={{ flex: 1 }} />
+        {/* R11: preset cấu hình quay có tên (chưa chọn vùng quay → không lưu được). */}
+        <PresetBar
+          names={(settings?.recordingPresets ?? []).map((p) => p.name)}
+          onApply={(name) => {
+            const p = settings?.recordingPresets.find((x) => x.name === name);
+            if (p) applyConfig(p.config);
+          }}
+          onSave={(name) => {
+            const config = currentConfig();
+            if (config) savePresets([...(settings?.recordingPresets ?? []).filter((p) => p.name !== name), { name, config }]);
+          }}
+          onDelete={(name) => savePresets((settings?.recordingPresets ?? []).filter((p) => p.name !== name))}
+          cannotSave={currentConfig() ? undefined : t("preset.needTarget")}
+        />
       </header>
 
       {/* GPU / driver dưới mức tối thiểu: báo cả ở màn thiết lập quay (vẫn cho quay). */}
