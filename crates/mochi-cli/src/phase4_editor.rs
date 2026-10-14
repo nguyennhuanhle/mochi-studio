@@ -69,7 +69,7 @@ pub async fn run() -> anyhow::Result<()> {
     };
     let base = level(&s);
     let set_vol = |s: &mut EditorSession, v: f64| {
-        s.apply(&EditOp::SetTrack { track_id: audio_track.clone(), name: None, locked: None, muted: None, hidden: None, volume_db: Some(v) })
+        s.apply(&EditOp::SetTrack { track_id: audio_track.clone(), name: None, locked: None, muted: None, hidden: None, volume_db: Some(v), duck: None, magnetic: None })
     };
     set_vol(&mut s, -12.0).map_err(e)?;
     let lower = level(&s);

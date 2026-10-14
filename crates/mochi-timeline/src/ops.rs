@@ -36,7 +36,22 @@ pub enum EditOp {
         /// E11: âm lượng cả track (dB).
         #[serde(default)]
         volume_db: Option<f64>,
+        /// E11 (v1): ducking.
+        #[serde(default)]
+        duck: Option<bool>,
+        /// E14 (v1): track nam châm.
+        #[serde(default)]
+        magnetic: Option<bool>,
     },
+    /// E11 (v1): khử ồn / chuẩn hóa / nén của clip.
+    #[serde(rename_all = "camelCase")]
+    SetAudioFx { clip_id: String, fx: mochi_project::AudioFx },
+    /// E14 (v1): nhóm clip (từ 2 clip) — di chuyển / xóa cùng nhau.
+    #[serde(rename_all = "camelCase")]
+    GroupClips { clip_ids: Vec<String> },
+    /// E14 (v1): bỏ nhóm của các clip này (cả nhóm của chúng).
+    #[serde(rename_all = "camelCase")]
+    UngroupClips { clip_ids: Vec<String> },
     /// Thả media lên timeline. `track_id` None → track phù hợp đầu tiên còn chỗ (tạo mới nếu cần).
     #[serde(rename_all = "camelCase")]
     AddClip {
@@ -153,6 +168,8 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             muted,
             hidden,
             volume_db,
+            duck,
+            magnetic,
         } => {
             let t = p
                 .tracks
@@ -177,6 +194,38 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             if let Some(v) = volume_db {
                 t.volume_db = v.clamp(MIN_VOLUME_DB, MAX_VOLUME_DB);
             }
+            if let Some(v) = duck {
+                t.duck = *v;
+            }
+            if let Some(v) = magnetic {
+                t.magnetic = *v;
+            }
+        }
+        EditOp::SetAudioFx { clip_id, fx } => {
+            ensure_clip_unlocked(p, clip_id)?;
+            let c = clip_mut(p, clip_id)?;
+            if matches!(c.content, ClipContent::Image) || c.content.is_overlay() {
+                return Err(TimelineError::EffectNotSupported);
+            }
+            c.audio_fx = fx.clone();
+        }
+        EditOp::GroupClips { clip_ids } => {
+            if clip_ids.len() < 2 {
+                return Err(TimelineError::Invalid { detail: "cần ít nhất 2 clip để nhóm".into() });
+            }
+            let gid = uuid::Uuid::new_v4().to_string();
+            for id in clip_ids {
+                ensure_clip_unlocked(p, id)?;
+                clip_mut(p, id)?.group = Some(gid.clone());
+            }
+        }
+        EditOp::UngroupClips { clip_ids } => {
+            let groups: Vec<String> = clip_ids.iter().filter_map(|id| clip(p, id).ok().and_then(|c| c.group.clone())).collect();
+            for c in p.clips.iter_mut() {
+                if c.group.as_ref().is_some_and(|g| groups.contains(g)) {
+                    c.group = None;
+                }
+            }
         }
         EditOp::AddClip {
             media_id,
@@ -190,6 +239,15 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
         } => {
             if let Some(tid) = track_id {
                 ensure_unlocked(p, tid)?;
+            }
+            // E14: clip cùng nhóm đi theo (chỉ dời thời gian, giữ track của chúng).
+            for id in group_members(p, clip_ids) {
+                if clip_ids.contains(&id) {
+                    continue;
+                }
+                ensure_clip_unlocked(p, &id)?;
+                let c = clip_mut(p, &id)?;
+                c.start = c.start + *delta;
             }
             for id in clip_ids {
                 let content = clip(p, id)?.content.clone();
@@ -234,7 +292,7 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
                 return Err(not_found("marker"));
             }
         }
-        EditOp::DeleteClips { clip_ids, ripple } => delete(p, clip_ids, *ripple)?,
+        EditOp::DeleteClips { clip_ids, ripple } => delete(p, &group_members(p, clip_ids), *ripple)?,
         EditOp::SetClipSpeed { clip_id, speed } => {
             ensure_clip_unlocked(p, clip_id)?;
             let c = clip_mut(p, clip_id)?;
@@ -791,6 +849,32 @@ fn delete(p: &mut Project, ids: &[String], ripple: bool) -> Result<(), TimelineE
     Ok(())
 }
 
+/// Các clip được chọn + mọi clip cùng nhóm với chúng (E14).
+fn group_members(p: &Project, ids: &[String]) -> Vec<String> {
+    let groups: Vec<&String> = p.clips.iter().filter(|c| ids.contains(&c.id)).filter_map(|c| c.group.as_ref()).collect();
+    let mut out: Vec<String> = ids.to_vec();
+    for c in &p.clips {
+        if c.group.as_ref().is_some_and(|g| groups.contains(&g)) && !out.contains(&c.id) {
+            out.push(c.id.clone());
+        }
+    }
+    out
+}
+
+/// E14 (v1): track nam châm — clip xếp liền nhau từ 0, không khoảng trống (chạy sau mọi thao tác).
+pub(crate) fn pack_magnetic(p: &mut Project) {
+    let magnetic: Vec<String> = p.tracks.iter().filter(|t| t.magnetic && !t.locked).map(|t| t.id.clone()).collect();
+    for tid in magnetic {
+        let mut idx: Vec<usize> = (0..p.clips.len()).filter(|&i| p.clips[i].track_id == tid).collect();
+        idx.sort_by_key(|&i| p.clips[i].start);
+        let mut at = Ticks::ZERO;
+        for i in idx {
+            p.clips[i].start = at;
+            at = p.clips[i].end();
+        }
+    }
+}
+
 /// Tên marker: bỏ khoảng trắng thừa, tối đa 80 ký tự, rỗng → "Marker".
 fn marker_label(l: &str) -> String {
     let l: String = l.trim().chars().take(80).collect();
@@ -987,6 +1071,37 @@ mod tests {
     }
 
     #[test]
+    fn grouped_clips_move_and_delete_together() {
+        let p = project();
+        let ids: Vec<String> = p.clips.iter().map(|c| c.id.clone()).collect();
+        // a1 [0,4) + b [10,20) thành một nhóm; dời a1 thêm 1 s → b cũng dời.
+        let a1 = p.clips.iter().find(|c| c.start == Ticks::ZERO).unwrap().id.clone();
+        let b = p.clips.iter().find(|c| c.media_id.as_deref() == Some("b")).unwrap().id.clone();
+        let p = crate::apply(&p, &EditOp::GroupClips { clip_ids: vec![a1.clone(), b.clone()] }).unwrap();
+        // Dời a1 vào khoảng trống không được vì chồng a2 → dời b (cuối) sang phải 2 s: a1 cũng dời 2 s → chồng a2 → từ chối.
+        assert!(crate::apply(&p, &EditOp::MoveClips { clip_ids: vec![b.clone()], delta: Ticks::from_secs(2.0), track_id: None }).is_err());
+        let p = crate::apply(&p, &EditOp::UngroupClips { clip_ids: vec![b.clone()] }).unwrap();
+        assert!(p.clips.iter().all(|c| c.group.is_none()));
+        let p = crate::apply(&p, &EditOp::GroupClips { clip_ids: vec![a1.clone(), b.clone()] }).unwrap();
+        let p = crate::apply(&p, &EditOp::DeleteClips { clip_ids: vec![a1.clone()], ripple: false }).unwrap();
+        assert!(p.clips.iter().all(|c| c.id != a1 && c.id != b), "xóa một clip trong nhóm → xóa cả nhóm");
+        assert_eq!(p.clips.len(), ids.len() - 2);
+    }
+
+    #[test]
+    fn magnetic_track_closes_gaps() {
+        let p = project();
+        let v1 = p.tracks[0].id.clone();
+        // a1 [0,4) a2 [4,10) b [10,20) → xóa a2 (không dồn) rồi bật nam châm → b dồn về 4 s.
+        let a2 = p.clips.iter().find(|c| c.start == Ticks::from_secs(4.0)).unwrap().id.clone();
+        let p = crate::apply(&p, &EditOp::DeleteClips { clip_ids: vec![a2], ripple: false }).unwrap();
+        let b_start = |p: &Project| p.clips.iter().find(|c| c.media_id.as_deref() == Some("b")).unwrap().start;
+        assert_eq!(b_start(&p), Ticks::from_secs(10.0));
+        let p = crate::apply(&p, &EditOp::SetTrack { track_id: v1, name: None, locked: None, muted: None, hidden: None, volume_db: None, duck: None, magnetic: Some(true) }).unwrap();
+        assert_eq!(b_start(&p), Ticks::from_secs(4.0));
+    }
+
+    #[test]
     fn removing_a_track_removes_its_clips_unless_locked() {
         let p = project();
         let p = crate::apply(
@@ -1000,7 +1115,7 @@ mod tests {
         )
         .unwrap();
         let overlay = p.tracks.iter().find(|t| t.kind == TrackKind::Overlay).unwrap().id.clone();
-        let locked = crate::apply(&p, &EditOp::SetTrack { track_id: overlay.clone(), name: None, locked: Some(true), muted: None, hidden: None, volume_db: None }).unwrap();
+        let locked = crate::apply(&p, &EditOp::SetTrack { track_id: overlay.clone(), name: None, locked: Some(true), muted: None, hidden: None, volume_db: None, duck: None, magnetic: None }).unwrap();
         assert!(matches!(crate::apply(&locked, &EditOp::RemoveTrack { track_id: overlay.clone() }), Err(TimelineError::TrackLocked { .. })));
         let p = crate::apply(&p, &EditOp::RemoveTrack { track_id: overlay.clone() }).unwrap();
         assert!(p.tracks.iter().all(|t| t.id != overlay));

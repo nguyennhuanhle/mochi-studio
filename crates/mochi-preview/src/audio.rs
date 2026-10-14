@@ -30,6 +30,38 @@ struct Stream {
     to: f64,
     /// S05: hệ số bù trôi (số giây tiếng ứng với 1 giây hình). 1 = không bù.
     rate: f64,
+    /// E11 (v1): độ to theo thời gian (chuẩn hóa, nén, ducking).
+    analysis: Arc<crate::audiofx::Analysis>,
+}
+
+impl Stream {
+    fn new(data: AudioData, media_offset: f64, from: f64, to: f64, rate: f64) -> Self {
+        let analysis = Arc::new(crate::audiofx::analyze(&data));
+        Self { data: Arc::new(data), media_offset, from, to, rate, analysis }
+    }
+
+    /// Bản đã khử ồn (cùng vị trí trong media).
+    fn denoised(&self) -> Self {
+        Self::new(crate::audiofx::denoise(&self.data), self.media_offset, self.from, self.to, self.rate)
+    }
+
+    /// Độ to momentary (LUFS) tại thời điểm `media_secs` của media; ngoài luồng → im lặng.
+    fn level_at(&self, media_secs: f64) -> f32 {
+        if media_secs < self.from || media_secs >= self.to {
+            return -120.0;
+        }
+        let i = ((media_secs - self.media_offset) * self.rate * crate::audiofx::ENVELOPE_HZ) as i64;
+        if i < 0 {
+            return -120.0;
+        }
+        self.analysis.momentary.get(i as usize).copied().unwrap_or(-120.0)
+    }
+}
+
+/// Cộng năng lượng nhiều luồng (dB).
+fn power_sum(levels: impl Iterator<Item = f32>) -> f32 {
+    let p: f64 = levels.map(|l| 10f64.powf(l as f64 / 10.0)).sum();
+    if p <= 1e-12 { -120.0 } else { (10.0 * p.log10()) as f32 }
 }
 
 #[derive(Default)]
@@ -39,6 +71,8 @@ struct MixState {
     streams: HashMap<String, Vec<Stream>>,
     /// E06 (v1): bản quay → thời điểm click (giây trong media), cho tiếng click.
     clicks: HashMap<String, Arc<Vec<f64>>>,
+    /// E11 (v1): media → các luồng tiếng đã khử ồn (tạo nền khi có clip bật khử ồn).
+    denoised: HashMap<String, Vec<Stream>>,
 }
 
 pub struct AudioEngine {
@@ -116,8 +150,10 @@ impl AudioEngine {
         {
             let mut st = self.state.lock().unwrap();
             st.streams.retain(|id, _| project.media.iter().any(|m| &m.id == id));
-            st.project = Some(project);
+            st.denoised.retain(|id, _| project.media.iter().any(|m| &m.id == id));
+            st.project = Some(project.clone());
         }
+        self.denoise_needed(&project);
         for (id, kind, path) in needed {
             let already = self.state.lock().unwrap().streams.contains_key(&id);
             if already || !self.loading.lock().unwrap().insert(id.clone()) {
@@ -135,11 +171,56 @@ impl AudioEngine {
                     if let Some(c) = clicks {
                         st.clicks.insert(id.clone(), c);
                     }
+                    let project = st.project.clone();
                     drop(st);
                     loading.lock().unwrap().remove(&id);
+                    if let Some(p) = project {
+                        denoise_in_background(&state, &loading, &p);
+                    }
                 })
                 .ok();
         }
+    }
+
+    /// E11: khử ồn nền cho media có clip bật khử ồn (chưa làm / chưa đang làm).
+    fn denoise_needed(&self, project: &Project) {
+        denoise_in_background(&self.state, &self.loading, project);
+    }
+}
+
+fn wants_denoise(project: &Project) -> Vec<String> {
+    let mut ids: Vec<String> = project
+        .clips
+        .iter()
+        .filter(|c| c.audio_fx.denoise)
+        .filter_map(|c| c.media_id.clone())
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn denoise_in_background(state: &Arc<Mutex<MixState>>, loading: &Arc<Mutex<std::collections::HashSet<String>>>, project: &Project) {
+    for id in wants_denoise(project) {
+        let key = format!("denoise:{id}");
+        let ready = {
+            let st = state.lock().unwrap();
+            st.denoised.contains_key(&id) || !st.streams.contains_key(&id)
+        };
+        if ready || !loading.lock().unwrap().insert(key.clone()) {
+            continue;
+        }
+        let state = state.clone();
+        let loading = loading.clone();
+        std::thread::Builder::new()
+            .name("mochi-denoise".into())
+            .spawn(move || {
+                let src: Vec<Stream> = state.lock().unwrap().streams.get(&id).cloned().unwrap_or_default();
+                let out: Vec<Stream> = src.iter().map(Stream::denoised).collect();
+                state.lock().unwrap().denoised.insert(id.clone(), out);
+                loading.lock().unwrap().remove(&key);
+            })
+            .ok();
     }
 }
 
@@ -154,13 +235,7 @@ fn decode_streams(kind: MediaKind, path: &std::path::Path) -> Vec<Stream> {
         AudioData::from_file(p)
             .map_err(|e| tracing::debug!("không có tiếng ở {}: {e}", p.display()))
             .ok()
-            .map(|d| Stream {
-                data: Arc::new(d),
-                media_offset: 0.0,
-                from: 0.0,
-                to: f64::INFINITY,
-                rate: 1.0,
-            })
+            .map(|d| Stream::new(d, 0.0, 0.0, f64::INFINITY, 1.0))
     };
     match kind {
         MediaKind::Audio | MediaKind::Video => whole(path).into_iter().collect(),
@@ -206,13 +281,7 @@ fn recording_streams(dir: &std::path::Path) -> Vec<Stream> {
                 if rate != 1.0 {
                     tracing::info!("S05: bù trôi tiếng {} ×{rate:.5}", p.display());
                 }
-                out.push(Stream {
-                    data: Arc::new(d),
-                    media_offset: media_cursor + shift,
-                    from: media_cursor,
-                    to: media_cursor + seg_len,
-                    rate,
-                });
+                out.push(Stream::new(d, media_cursor + shift, media_cursor, media_cursor + seg_len, rate));
             }
         }
         media_cursor += seg_len;
@@ -266,7 +335,14 @@ impl OfflineMixer {
             }
             streams.insert(id, s);
         }
-        Self { st: MixState { project: Some(project), streams, clicks } }
+        let mut denoised = HashMap::new();
+        for id in wants_denoise(&project) {
+            if let Some(s) = streams.get(&id) {
+                let v: &Vec<Stream> = s;
+                denoised.insert(id, v.iter().map(Stream::denoised).collect());
+            }
+        }
+        Self { st: MixState { project: Some(project), streams, clicks, denoised } }
     }
 
     /// Có clip nào phát ra tiếng không (không thì khỏi tạo luồng AAC).
@@ -363,6 +439,33 @@ fn mix_clicks(st: &MixState, clip: &mochi_project::Clip, gain: f32, start: i64, 
     }
 }
 
+/// E11 (v1) ducking: phần thời gian quanh `t` (±250 ms) có tiếng nói ở các track không bị duck
+/// → hạ âm lượng tương ứng (tối đa `DUCK_DB`), mượt nhờ lấy trung bình cửa sổ.
+fn duck_gain(st: &MixState, project: &Project, t: i64) -> f32 {
+    let tps = mochi_project::TICKS_PER_SECOND as f64;
+    let mut hits = 0;
+    const PROBES: i32 = 11;
+    for k in 0..PROBES {
+        let at = t as f64 + (k as f64 - 5.0) * 0.05 * tps;
+        let voice = project.clips.iter().any(|c| {
+            if c.muted || c.hold.is_some() || (c.start.0 as f64) > at || (c.end().0 as f64) <= at {
+                return false;
+            }
+            let Some(tr) = project.tracks.iter().find(|tr| tr.id == c.track_id) else { return false };
+            if tr.duck || tr.muted || tr.kind == TrackKind::Overlay {
+                return false;
+            }
+            let Some(streams) = c.media_id.as_ref().and_then(|id| st.streams.get(id)) else { return false };
+            let media_secs = (c.source_in.0 as f64 + (at - c.start.0 as f64) * c.speed) / tps;
+            power_sum(streams.iter().map(|s| s.level_at(media_secs))) > crate::audiofx::VOICE_LUFS
+        });
+        if voice {
+            hits += 1;
+        }
+    }
+    db_to_gain((crate::audiofx::DUCK_DB * hits as f32 / PROBES as f32) as f64)
+}
+
 fn db_to_gain(db: f64) -> f32 {
     10f64.powf(db / 20.0) as f32
 }
@@ -387,9 +490,28 @@ fn mix(st: &MixState, start: i64, tick_per_frame: f64, frames: usize, channels: 
         }
         let gain = db_to_gain(clip.volume_db + track.volume_db);
         mix_clicks(st, clip, gain, start, tick_per_frame, frames, channels, out);
-        let Some(streams) = clip.media_id.as_ref().and_then(|id| st.streams.get(id)) else {
+        let Some(original) = clip.media_id.as_ref().and_then(|id| st.streams.get(id)) else {
             continue;
         };
+        // E11 (v1): khử ồn (khi bản khử ồn đã xong), chuẩn hóa −16 LUFS, nén, ducking.
+        let afx = &clip.audio_fx;
+        let streams: &Vec<Stream> = if afx.denoise {
+            clip.media_id.as_ref().and_then(|id| st.denoised.get(id)).unwrap_or(original)
+        } else {
+            original
+        };
+        let norm_db = if afx.normalize {
+            crate::audiofx::normalize_db(power_sum(streams.iter().map(|s| s.analysis.integrated)))
+        } else {
+            0.0
+        };
+        let gain = gain * db_to_gain(norm_db as f64);
+        let (duck0, duck1) = if track.duck {
+            (duck_gain(st, project, start), duck_gain(st, project, end))
+        } else {
+            (1.0, 1.0)
+        };
+        let mut comp_block = (-1i64, 1.0f32);
         let dur = clip.duration().0 as f64;
         for i in 0..frames {
             let t = start as f64 + i as f64 * tick_per_frame;
@@ -406,7 +528,19 @@ fn mix(st: &MixState, start: i64, tick_per_frame: f64, frames: usize, channels: 
             }
             let media_secs =
                 (clip.source_in.0 as f64 + local * clip.speed) / mochi_project::TICKS_PER_SECOND as f64;
-            let g = gain * env as f32;
+            let mut g = gain * env as f32;
+            if afx.compress {
+                // Hệ số nén đổi mỗi 10 ms (theo đường độ to đã phân tích).
+                let block = (media_secs * crate::audiofx::ENVELOPE_HZ) as i64;
+                if block != comp_block.0 {
+                    let level = power_sum(streams.iter().map(|s| s.level_at(media_secs))) + norm_db;
+                    comp_block = (block, db_to_gain(crate::audiofx::compressor_db(level) as f64));
+                }
+                g *= comp_block.1;
+            }
+            if track.duck {
+                g *= duck0 + (duck1 - duck0) * (i as f32 / frames.max(1) as f32);
+            }
             for s in streams {
                 if media_secs < s.from || media_secs >= s.to {
                     continue;

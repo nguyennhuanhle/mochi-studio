@@ -628,5 +628,22 @@
     "pos_topCenter": "Trên giữa",
     "size": "Cỡ chữ",
     "hint": "Lấy từ dữ liệu ghi phím lúc quay (bật \"Ghi phím bấm\" ở màn thiết lập quay)."
+  },
+  "afx": {
+    "title": "Âm thanh nâng cao",
+    "denoise": "Khử ồn (AI chạy trên máy)",
+    "normalize": "Chuẩn hóa độ to (−16 LUFS)",
+    "compress": "Nén (giọng đều hơn)",
+    "hint": "Xử lý trên máy, không gửi tiếng đi đâu. Khử ồn chạy nền vài giây với file dài; preview dùng bản khử ồn khi xong."
+  },
+  "track": {
+    "magnetic": "Track nam châm: clip tự dồn lại, không để khoảng trống",
+    "duck": "Ducking: tự nhỏ đi khi các track khác có tiếng nói (dùng cho nhạc nền)"
+  },
+  "group": {
+    "group": "Nhóm",
+    "ungroup": "Bỏ nhóm",
+    "hint": "Ctrl+bấm để chọn thêm clip, rồi nhóm lại — clip cùng nhóm di chuyển / xóa cùng nhau",
+    "member": "Thuộc một nhóm"
   }
 }

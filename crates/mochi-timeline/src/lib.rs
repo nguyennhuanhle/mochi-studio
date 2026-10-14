@@ -53,6 +53,7 @@ fn not_found(what: impl Into<String>) -> TimelineError {
 pub fn apply(project: &Project, op: &EditOp) -> Result<Project, TimelineError> {
     let mut next = project.clone();
     ops::apply_in_place(&mut next, op)?;
+    ops::pack_magnetic(&mut next);
     validate(&next)?;
     Ok(next)
 }

@@ -955,7 +955,19 @@ export type EditOp = { op: "addTrack"; kind: TrackKind } |
  * Chỉ xóa được track rỗng.
  * Xóa track cùng mọi clip trên đó (UI hỏi xác nhận khi track còn clip). Track khóa → từ chối.
  */
-{ op: "removeTrack"; trackId: string } | { op: "setTrack"; trackId: string; name: string | null; locked: boolean | null; muted: boolean | null; hidden: boolean | null; volumeDb?: number | null } | 
+{ op: "removeTrack"; trackId: string } | { op: "setTrack"; trackId: string; name: string | null; locked: boolean | null; muted: boolean | null; hidden: boolean | null; volumeDb?: number | null; duck?: boolean | null; magnetic?: boolean | null } | 
+/**
+ * E11 (v1): khử ồn / chuẩn hóa / nén của clip.
+ */
+{ op: "setAudioFx"; clipId: string; fx: AudioFx } | 
+/**
+ * E14 (v1): nhóm clip (từ 2 clip) — di chuyển / xóa cùng nhau.
+ */
+{ op: "groupClips"; clipIds: string[] } | 
+/**
+ * E14 (v1): bỏ nhóm của các clip này (cả nhóm của chúng).
+ */
+{ op: "ungroupClips"; clipIds: string[] } | 
 /**
  * Thả media lên timeline. `track_id` None → track phù hợp đầu tiên còn chỗ (tạo mới nếu cần).
  */

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Clip, DeviceFrame, Easing, EditOp, Keyframe, Look, Ticks, Transform, TransitionKind } from "../bindings";
+import type { AudioFx, Clip, DeviceFrame, Easing, EditOp, Keyframe, Look, Ticks, Transform, TransitionKind } from "../bindings";
 import { formatTimecode, secs, ticks } from "../lib/editor";
 import { Check, ColorField, Section, Select, Slider } from "./controls";
 
@@ -14,8 +14,10 @@ export default function ClipFxInspector(props: { clip: Clip; playhead: Ticks; ap
   const visual = c !== "audio" && c !== "blur" && c !== "spotlight";
   const media = c === "video" || c === "recording" || c === "image";
   const canFreeze = (c === "video" || c === "recording") && clip.hold == null;
+  const audible = c === "video" || c === "recording" || c === "audio";
   return (
     <>
+      {audible && <AudioFxSection {...props} />}
       {visual && <MotionSection {...props} />}
       {c !== "audio" && <TransitionSection {...props} />}
       {media && <LookSection {...props} />}
@@ -200,6 +202,21 @@ function LookSection(props: { clip: Clip; apply: (op: EditOp) => Promise<boolean
       <Slider label={t("fx.shadow")} value={look.shadow ?? 0} min={0} max={100} format={(v) => `${Math.round(v)}%`} onCommit={(shadow) => set({ shadow })} />
       {changed && <button onClick={() => set({ brightness: 0, contrast: 0, saturation: 0, borderWidth: 0, cornerRadius: 0, shadow: 0, device: "none" })}>{t("fx.resetLook")}</button>}
       <Check label={t("fx.grayscale")} checked={(look.saturation ?? 0) <= -100} onChange={(on) => set({ saturation: on ? -100 : 0 })} />
+    </Section>
+  );
+}
+
+/** E11 (v1): khử ồn / chuẩn hóa độ to / nén — xử lý trên máy, dùng chung cho preview và video xuất. */
+function AudioFxSection(props: { clip: Clip; apply: (op: EditOp) => Promise<boolean> }) {
+  const { t } = useTranslation();
+  const fx: AudioFx = props.clip.audioFx ?? { denoise: false, normalize: false, compress: false };
+  const set = (patch: Partial<AudioFx>) => props.apply({ op: "setAudioFx", clipId: props.clip.id, fx: { ...fx, ...patch } });
+  return (
+    <Section title={t("afx.title")} defaultOpen={fx.denoise || fx.normalize || fx.compress}>
+      <Check label={t("afx.denoise")} checked={fx.denoise} onChange={(denoise) => set({ denoise })} />
+      <Check label={t("afx.normalize")} checked={fx.normalize} onChange={(normalize) => set({ normalize })} />
+      <Check label={t("afx.compress")} checked={fx.compress} onChange={(compress) => set({ compress })} />
+      <p className="muted small">{t("afx.hint")}</p>
     </Section>
   );
 }

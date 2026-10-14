@@ -6,6 +6,7 @@
 //! - Đang dừng: chỉ render khi có thay đổi (tua, sửa project), seek chính xác từng frame.
 
 mod audio;
+pub mod audiofx;
 pub mod host;
 mod present;
 

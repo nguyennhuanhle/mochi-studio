@@ -628,5 +628,22 @@
     "pos_topCenter": "Top center",
     "size": "Font size",
     "hint": "Uses the keystrokes captured while recording (turn on \"Record keystrokes\" in the recording setup)."
+  },
+  "afx": {
+    "title": "Advanced audio",
+    "denoise": "Noise reduction (on-device AI)",
+    "normalize": "Normalize loudness (−16 LUFS)",
+    "compress": "Compressor (more even voice)",
+    "hint": "Processed on your computer; nothing is uploaded. Noise reduction runs in the background for long files; the preview switches to it when ready."
+  },
+  "track": {
+    "magnetic": "Magnetic track: clips snap together with no gaps",
+    "duck": "Ducking: lowers this track while other tracks have speech (for background music)"
+  },
+  "group": {
+    "group": "Group",
+    "ungroup": "Ungroup",
+    "hint": "Ctrl+click to select more clips, then group them — grouped clips move and delete together",
+    "member": "Part of a group"
   }
 }

@@ -4456,6 +4456,7 @@ name = "mochi-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cap-audio",
  "cap-camera",
  "cap-project",
  "cap-recording",
@@ -4574,6 +4575,7 @@ dependencies = [
  "anyhow",
  "cap-audio",
  "cap-project",
+ "cap-rnnoise",
  "cpal",
  "image 0.25.8",
  "mochi-project",

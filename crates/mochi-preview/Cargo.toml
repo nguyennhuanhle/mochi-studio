@@ -10,6 +10,7 @@ publish = false
 mochi-project = { path = "../mochi-project" }
 mochi-render = { path = "../mochi-render" }
 cap-audio = { path = "../../vendor/cap/crates/audio" }
+cap-rnnoise = { path = "../../vendor/cap/crates/rnnoise" }
 cap-project = { path = "../../vendor/cap/crates/project" }
 anyhow = { workspace = true }
 cpal = { workspace = true }

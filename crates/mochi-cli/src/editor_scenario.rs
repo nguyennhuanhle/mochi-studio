@@ -195,10 +195,10 @@ pub fn run() -> anyhow::Result<()> {
     print_timeline("xóa nửa trái (0–3s) có ripple → các clip sau trên Video 1 dồn sang trái đúng 3s", s.project());
 
     println!("\n== Track khóa ==");
-    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: None, locked: Some(true), muted: None, hidden: None, volume_db: None })?;
+    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: None, locked: Some(true), muted: None, hidden: None, volume_db: None, duck: None, magnetic: None })?;
     let r = s.apply(&EditOp::SplitClip { clip_id: right.clone(), at: Ticks::from_secs(1.0) });
     println!("  cắt clip trên track khóa → {}", r.err().map(|e| err(&e)).unwrap_or("OK?!".into()));
-    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: None, locked: Some(false), muted: None, hidden: None, volume_db: None })?;
+    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: None, locked: Some(false), muted: None, hidden: None, volume_db: None, duck: None, magnetic: None })?;
 
     println!("\n== Undo / Redo ==");
     s.apply(&EditOp::DeleteClips { clip_ids: vec![right.clone()], ripple: false })?;
@@ -221,7 +221,7 @@ pub fn run() -> anyhow::Result<()> {
 
     println!("\n== S01 Lưu + backup ==");
     s.save(true)?;
-    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: Some("Màn hình".into()), locked: None, muted: None, hidden: None, volume_db: None })?;
+    s.apply(&EditOp::SetTrack { track_id: v1.clone(), name: Some("Màn hình".into()), locked: None, muted: None, hidden: None, volume_db: None, duck: None, magnetic: None })?;
     std::thread::sleep(std::time::Duration::from_millis(1100));
     s.save(true)?;
     for b in s.backups() {

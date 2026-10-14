@@ -28,6 +28,7 @@ export async function runV1(mode: string, c: Ctx) {
   if (mode === "v1r") await presetDebug(c);
   if (mode === "v1b") await roundB(c);
   if (mode === "v1c") await roundC(c);
+  if (mode === "v1d") await roundD(c);
 }
 
 /** Kéo một thanh trượt (theo nhãn) tới giá trị `v` rồi "thả" (sự kiện change). */
@@ -175,6 +176,46 @@ async function roundC({ navigate, outDir, snap, log, sleep }: Ctx) {
     navigate("/");
   } catch (e) {
     log.push(`v1c error: ${String(e)}`);
+  }
+  const s = await commands.settingsGet();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
+}
+
+async function roundD({ navigate, outDir, snap, log, sleep }: Ctx) {
+  const root = outDir.replace(/[\\/]ui-snap.*$/, "");
+  try {
+    const open = await commands.projectOpen(`${root}/phase6/audio/Am.mochi`);
+    if (open.status !== "ok") throw new Error(JSON.stringify(open.error));
+    navigate("/editor");
+    await sleep(4000);
+    const view = async () => (await commands.projectView())!;
+    const clips = (await view()).project.clips;
+    select(clips[0].id);
+    await sleep(1200);
+    openSection(/âm thanh nâng cao|advanced audio/i);
+    await sleep(300);
+    byText<HTMLLabelElement>("label.check", /khử ồn|noise reduction/i)?.querySelector("input")?.click();
+    await sleep(800);
+    byText<HTMLLabelElement>("label.check", /chuẩn hóa độ to|normalize loudness/i)?.querySelector("input")?.click();
+    await sleep(800);
+    log.push(`E11 audioFx: ${JSON.stringify((await view()).project.clips.find((c) => c.id === clips[0].id)?.audioFx)}`);
+    // E14: Ctrl+bấm clip thứ hai rồi Nhóm.
+    const second = [...document.querySelectorAll<HTMLElement>(".tl-clip")].find((el) => !el.classList.contains("selected"));
+    second?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, ctrlKey: true, button: 0 }));
+    await sleep(500);
+    byText<HTMLButtonElement>(".editor-toolbar button", /🔗/)?.click();
+    await sleep(800);
+    log.push(`E14 nhóm: ${JSON.stringify((await view()).project.clips.map((c) => c.group != null))}`);
+    // Track nam châm (🧲) trên track đầu.
+    const magnet = [...document.querySelectorAll<HTMLButtonElement>(".tl-header button")].find((b) => b.textContent?.includes("🧲"));
+    magnet?.click();
+    await sleep(800);
+    log.push(`E14 nam châm: ${JSON.stringify((await view()).project.tracks.map((t) => [t.name, t.magnetic, t.duck]))}`);
+    await snap("main", "v1d-1-audio-group");
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`v1d error: ${String(e)}`);
   }
   const s = await commands.settingsGet();
   await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });

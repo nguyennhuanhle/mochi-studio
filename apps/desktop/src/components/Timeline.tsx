@@ -44,6 +44,9 @@ export default function Timeline(props: {
   waveforms: Record<string, number[]>;
   thumbs: Record<string, string | null>;
   onSelect: (id: string | null) => void;
+  /** E14 (v1): Ctrl+bấm để chọn thêm nhiều clip (nhóm). */
+  multi: string[];
+  onToggleMulti: (id: string) => void;
   onSeek: (t: Ticks) => void;
   apply: (op: EditOp) => Promise<boolean>;
   selectedZoom: string | null;
@@ -108,6 +111,10 @@ export default function Timeline(props: {
   function beginDrag(e: ReactMouseEvent, clip: Clip, kind: Drag["kind"]) {
     e.stopPropagation();
     if (e.button !== 0) return;
+    if (e.ctrlKey || e.metaKey) {
+      props.onToggleMulti(clip.id);
+      return;
+    }
     props.onSelect(clip.id);
     const track = p.tracks.find((tr) => tr.id === clip.trackId);
     if (track?.locked) return;
@@ -276,6 +283,8 @@ export default function Timeline(props: {
                     "tl-clip",
                     `kind-${c.content.type}`,
                     props.selected === c.id ? "selected" : "",
+                    props.multi.includes(c.id) ? "multi" : "",
+                    c.group ? "grouped" : "",
                     dragging ? "dragging" : "",
                     bad ? "bad" : "",
                     media && view.missing.includes(media.id) ? "missing" : "",
@@ -293,6 +302,7 @@ export default function Timeline(props: {
                       )}
                       <span className="tl-clip-name">
                         {c.hold != null && <span title={t("fx.freeze")}>❄ </span>}
+                        {c.group && <span title={t("group.member")}>🔗 </span>}
                         {c.content.type === "text"
                           ? `T  ${c.content.text}`
                           : c.content.type === "blur"
@@ -417,6 +427,8 @@ export default function Timeline(props: {
 }
 
 function TrackHeader({ track, clips, apply }: { track: Track; clips: number; apply: (op: EditOp) => Promise<boolean> }) {
+  const toggle = (patch: { duck?: boolean; magnetic?: boolean }) =>
+    apply({ op: "setTrack", trackId: track.id, name: null, locked: null, muted: null, hidden: null, volumeDb: null, duck: patch.duck ?? null, magnetic: patch.magnetic ?? null });
   const { t } = useTranslation();
   // Xóa track: track còn clip → hỏi trước (xóa luôn các clip, một bước hoàn tác).
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -461,6 +473,15 @@ function TrackHeader({ track, clips, apply }: { track: Track; clips: number; app
             onClick={() => set({ hidden: !track.hidden })}
           >
             {track.hidden ? "◌" : "◉"}
+          </button>
+        )}
+        {/* E14 (v1): track nam châm; E11 (v1): ducking cho track nhạc nền. */}
+        <button className={track.magnetic ? "tb on" : "tb"} title={t("track.magnetic")} onClick={() => toggle({ magnetic: !track.magnetic })}>
+          🧲
+        </button>
+        {track.kind !== "overlay" && (
+          <button className={track.duck ? "tb on" : "tb"} title={t("track.duck")} onClick={() => toggle({ duck: !track.duck })}>
+            ⇣
           </button>
         )}
         <button

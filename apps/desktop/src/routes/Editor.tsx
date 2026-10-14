@@ -35,6 +35,7 @@ export default function Editor() {
   const navigate = useNavigate();
   const [view, setView] = useState<ProjectView | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [multi, setMulti] = useState<string[]>([]);
   const [selectedZoom, setSelectedZoom] = useState<string | null>(null);
   const [showRecovered, setShowRecovered] = useState(false);
   const [playhead, setPlayhead] = useState<Ticks>(0);
@@ -606,6 +607,22 @@ export default function Editor() {
         <button onClick={() => apply({ op: "addTrack", kind: "video" })}>{t("editor.addVideoTrack")}</button>
         <button onClick={() => apply({ op: "addTrack", kind: "audio" })}>{t("editor.addAudioTrack")}</button>
         <span className="sep" />
+        {/* E14 (v1): nhóm clip — Ctrl+bấm để chọn nhiều. */}
+        {(() => {
+          const chosen = [...new Set([...(selected ? [selected] : []), ...multi])];
+          const grouped = view.project.clips.some((c) => chosen.includes(c.id) && c.group);
+          return (
+            <>
+              <button disabled={chosen.length < 2} title={t("group.hint")} onClick={() => apply({ op: "groupClips", clipIds: chosen }).then(() => setMulti([]))}>
+                🔗 {t("group.group")}
+              </button>
+              <button disabled={!grouped} onClick={() => apply({ op: "ungroupClips", clipIds: chosen })}>
+                {t("group.ungroup")}
+              </button>
+            </>
+          );
+        })()}
+        <span className="sep" />
         <button onClick={() => setShowMarkers(true)} title={t("marker.hint")}>
           🔖 {view.project.markers?.length ?? 0}
         </button>
@@ -664,8 +681,11 @@ export default function Editor() {
         thumbs={thumbs}
         onSelect={(id) => {
           setSelected(id);
+          setMulti([]);
           if (id !== selected) setSelectedZoom(null);
         }}
+        multi={multi}
+        onToggleMulti={(id) => setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]))}
         selectedZoom={selectedZoom}
         onSelectZoom={(clipId, zoomId) => {
           setSelected(clipId);
