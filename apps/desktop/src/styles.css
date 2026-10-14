@@ -320,3 +320,6 @@ html.overlay-window, html.overlay-window body, html.overlay-window #root { backg
 .editor-toolbar > * { flex-shrink: 0; white-space: nowrap; }
 .tl-clip.multi { outline: 2px dashed var(--accent); outline-offset: -2px; }
 .tl-clip.grouped { box-shadow: inset 0 -3px 0 rgba(255, 213, 74, 0.8); }
+.batch-list { max-height: 280px; overflow-y: auto; }
+.ok-text { color: var(--ok); }
+.error-text { color: var(--danger); }

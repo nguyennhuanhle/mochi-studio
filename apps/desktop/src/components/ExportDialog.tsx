@@ -14,7 +14,7 @@ import {
 } from "../bindings";
 import { formatBytes } from "../lib/recorder";
 import { exportErrorMessage, startExport } from "../lib/exports";
-import { formatTimecode } from "../lib/editor";
+import { formatTimecode, ticks } from "../lib/editor";
 import Dialog from "./Dialog";
 import { Check } from "./controls";
 
@@ -50,6 +50,9 @@ export default function ExportDialog(props: {
   const overwrite = overwriteFor !== null && overwriteFor === output;
   useEffect(() => setOverwriteFor(null), [output]);
   const [blackFill, setBlackFill] = useState(false);
+  // X05 (v1): kèm file phụ đề .srt cạnh video.
+  const hasCaptions = (props.view.project.captions?.length ?? 0) > 0;
+  const [withSubtitles, setWithSubtitles] = useState(true);
   const [est, setEst] = useState<{ ok: ExportEstimate } | { err: ExportError } | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -60,7 +63,7 @@ export default function ExportDialog(props: {
 
   // Đuôi file theo định dạng.
   useEffect(() => {
-    setOutput((o) => (o ? o.replace(/\.(mp4|gif|m4a|mp3)$/i, "") + `.${format}` : o));
+    setOutput((o) => (o ? o.replace(/\.(mp4|gif|m4a|mp3|webm)$/i, "") + `.${format}` : o));
   }, [format]);
 
   const audioOnly = format === "m4a" || format === "mp3";
@@ -92,9 +95,10 @@ export default function ExportDialog(props: {
             output,
             overwrite,
             allowBlackFill: blackFill,
+            subtitles: withSubtitles && hasCaptions,
           }
         : null,
-    [format, codec, shortSide, fps, quality, useRange, hasRange, props.inOut.start, props.inOut.end, output, overwrite, blackFill],
+    [format, codec, shortSide, fps, quality, useRange, hasRange, props.inOut.start, props.inOut.end, output, overwrite, blackFill, withSubtitles, hasCaptions],
   );
 
   useEffect(() => {
@@ -110,9 +114,35 @@ export default function ExportDialog(props: {
     };
   }, [settings]);
 
+  // X06 (v1): mỗi đoạn giữa hai marker một file (đoạn trước marker đầu nếu dài hơn 1 giây).
+  const markers = [...(props.view.project.markers ?? [])].sort((a, b) => a.at - b.at);
+  const markerRanges = (() => {
+    const end = props.view.duration;
+    const cuts = markers.map((m) => ({ at: m.at, label: m.label })).filter((m) => m.at < end);
+    const out: { start: number; end: number; label: string }[] = [];
+    if (cuts.length && cuts[0].at > ticks(1)) out.push({ start: 0, end: cuts[0].at, label: "intro" });
+    cuts.forEach((c, i) => out.push({ start: c.at, end: i + 1 < cuts.length ? cuts[i + 1].at : end, label: c.label }));
+    return out.filter((r) => r.end - r.start > ticks(0.1));
+  })();
+  const [byMarkers, setByMarkers] = useState(false);
+
   async function start() {
     if (!settings) return;
     setStarting(true);
+    if (byMarkers && markerRanges.length) {
+      const base = settings.output.replace(/\.[^.\\/]+$/, "");
+      const ext = settings.output.slice(base.length);
+      for (const [i, r] of markerRanges.entries()) {
+        const safe = r.label.replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 40) || `${i + 1}`;
+        const err = await startExport({ ...settings, range: { start: r.start, end: r.end }, output: `${base}-${String(i + 1).padStart(2, "0")}-${safe}${ext}` });
+        if (err) {
+          setStarting(false);
+          return setEst({ err });
+        }
+      }
+      setStarting(false);
+      return props.onClose();
+    }
     const err = await startExport(settings);
     setStarting(false);
     if (err) setEst({ err });
@@ -154,6 +184,7 @@ export default function ExportDialog(props: {
           <option value="mp4">MP4</option>
           <option value="gif">GIF</option>
           {/* X02 (v1): chỉ âm thanh. */}
+          <option value="webm">WebM ({t("export.webmAlpha")})</option>
           <option value="m4a">M4A ({t("export.audioOnly")})</option>
           <option value="mp3">MP3 ({t("export.audioOnly")})</option>
         </select>
@@ -206,7 +237,16 @@ export default function ExportDialog(props: {
         </select>
 
         <span>{t("export.range")}</span>
-        <select value={useRange && hasRange ? "range" : "all"} onChange={(e) => setUseRange(e.target.value === "range")}>
+        <select
+          value={byMarkers ? "markers" : useRange && hasRange ? "range" : "all"}
+          onChange={(e) => {
+            setByMarkers(e.target.value === "markers");
+            setUseRange(e.target.value === "range");
+          }}
+        >
+          <option value="markers" disabled={!markerRanges.length}>
+            {t("export.byMarkers", { n: markerRanges.length })}
+          </option>
           <option value="all">{t("export.rangeAll", { d: formatTimecode(view.duration) })}</option>
           <option value="range" disabled={!hasRange}>
             {hasRange
@@ -261,6 +301,9 @@ export default function ExportDialog(props: {
         {err && <div>{exportErrorMessage(t, err)}</div>}
         {(err?.code === "fileExists" || overwrite) && (
           <Check label={t("export.overwrite")} checked={overwrite} onChange={(v) => setOverwriteFor(v ? output : null)} />
+        )}
+        {hasCaptions && !audioOnly && (
+          <Check label={t("export.subtitles")} checked={withSubtitles} onChange={setWithSubtitles} />
         )}
         {(err?.code === "missingMedia" || blackFill) && (
           <Check label={t("export.allowBlack")} checked={blackFill} onChange={setBlackFill} />

@@ -20,6 +20,7 @@ mochi-timeline = { path = "../mochi-timeline" }
 mochi-editor = { path = "../mochi-editor" }
 mochi-render = { path = "../mochi-render" }
 mochi-preview = { path = "../mochi-preview" }
+mochi-captions = { path = "../mochi-captions" }
 cap-audio = { path = "../../vendor/cap/crates/audio" }
 mochi-export = { path = "../mochi-export" }
 mochi-jobs = { path = "../mochi-jobs" }

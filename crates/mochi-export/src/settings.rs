@@ -14,6 +14,8 @@ pub enum ExportFormat {
     M4a,
     /// X02 (v1): chỉ âm thanh, MP3 (LAME).
     Mp3,
+    /// X02 (v1): WebM (VP9 + Opus) giữ nền trong suốt.
+    Webm,
 }
 
 impl ExportFormat {
@@ -84,6 +86,9 @@ pub struct ExportSettings {
     pub overwrite: bool,
     /// K-X2: chấp nhận thay đoạn thiếu media bằng khung trống.
     pub allow_black_fill: bool,
+    /// X05 (v1): ghi kèm phụ đề `.srt` cạnh file xuất (thời gian theo đoạn xuất).
+    #[serde(default)]
+    pub subtitles: bool,
 }
 
 /// Số chẵn gần nhất (encoder YUV 4:2:0 cần kích thước chẵn).
@@ -144,5 +149,6 @@ pub fn with_format_extension(output: &Path, format: ExportFormat) -> PathBuf {
         ExportFormat::Gif => "gif",
         ExportFormat::M4a => "m4a",
         ExportFormat::Mp3 => "mp3",
+        ExportFormat::Webm => "webm",
     })
 }

@@ -426,6 +426,79 @@ async openReleasesPage() : Promise<Result<null, string>> {
 }
 },
 /**
+ * X06 (v1): xuất một project KHÁC project đang mở (xuất hàng loạt): mở gói ở chế độ đọc (giữ khóa
+ * trong lúc chụp), chụp project + đường dẫn media rồi đóng ngay; job chạy như mọi job xuất khác.
+ */
+async exportProjectFile(dir: string, settings: ExportSettings) : Promise<Result<ExportJobInfo, ExportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_project_file", { dir, settings }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captionsModels() : Promise<CaptionModel[]> {
+    return await TAURI_INVOKE("captions_models");
+},
+/**
+ * CPU có chạy được whisper.cpp không (AVX2 / FMA / F16C).
+ */
+async captionsCpuCheck() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("captions_cpu_check") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captionsCancel() : Promise<void> {
+    await TAURI_INVOKE("captions_cancel");
+},
+/**
+ * Tải model (người dùng đã đồng ý ở UI, biết trước dung lượng).
+ */
+async captionsDownload(model: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("captions_download", { model }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Phiên âm toàn bộ tiếng của timeline (đúng bộ trộn của preview / xuất) → phụ đề theo thời gian timeline.
+ */
+async captionsGenerate(model: string, language: string | null) : Promise<Result<Caption[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("captions_generate", { model, language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Xuất phụ đề của project ra .srt / .vtt (hộp thoại lưu). None = người dùng hủy.
+ */
+async captionsExport(vtt: boolean) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("captions_export", { vtt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Nhập .srt / .vtt (hộp thoại mở). None = người dùng hủy.
+ */
+async captionsImport() : Promise<Result<Caption[] | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("captions_import") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Phiên bản app đang chạy (để so với trang Releases).
  */
 async appVersion() : Promise<string> {
@@ -586,6 +659,7 @@ async devSnapshotCloseMain() : Promise<Result<null, string>> {
 export const events = __makeEvents__<{
 autosaveStatus: AutosaveStatus,
 cacheTrimmed: CacheTrimmed,
+captionsProgress: CaptionsProgress,
 closeSaveFailed: CloseSaveFailed,
 exportEvent: ExportEvent,
 jobsUpdate: JobsUpdate,
@@ -597,6 +671,7 @@ regionSelected: RegionSelected
 }>({
 autosaveStatus: "autosave-status",
 cacheTrimmed: "cache-trimmed",
+captionsProgress: "captions-progress",
 closeSaveFailed: "close-save-failed",
 exportEvent: "export-event",
 jobsUpdate: "jobs-update",
@@ -748,6 +823,7 @@ export type Canvas = { width: number; height: number; fps: number }
  * E13: một dòng phụ đề. `words` (nếu có) cho phụ đề động hiện từng chữ.
  */
 export type Caption = { id: string; start: Ticks; end: Ticks; text: string; words?: CaptionWord[] }
+export type CaptionModel = { id: string; bytes: number; installed: boolean }
 export type CaptionStyle = { 
 /**
  * Hiện phụ đề trong preview / video xuất (burn-in, X05).
@@ -770,6 +846,14 @@ y: number;
  */
 animated: boolean; highlight: string }
 export type CaptionWord = { start: Ticks; end: Ticks; text: string }
+/**
+ * Tiến độ tải model / phiên âm (0–100).
+ */
+export type CaptionsProgress = { 
+/**
+ * "download" | "audio" | "transcribe"
+ */
+stage: string; pct: number }
 /**
  * Vùng quay (R01). Toạ độ `Area` là toạ độ LOGIC trên màn hình `display_id`, giống Cap.
  */
@@ -957,6 +1041,10 @@ export type EditOp = { op: "addTrack"; kind: TrackKind } |
  */
 { op: "removeTrack"; trackId: string } | { op: "setTrack"; trackId: string; name: string | null; locked: boolean | null; muted: boolean | null; hidden: boolean | null; volumeDb?: number | null; duck?: boolean | null; magnetic?: boolean | null } | 
 /**
+ * E13 (v1): thay toàn bộ phụ đề (sau phiên âm, nhập SRT / VTT, hoặc sửa tay).
+ */
+{ op: "setCaptions"; captions: Caption[] } | { op: "setCaptionStyle"; style: CaptionStyle } | 
+/**
  * E11 (v1): khử ồn / chuẩn hóa / nén của clip.
  */
 { op: "setAudioFx"; clipId: string; fx: AudioFx } | 
@@ -1092,7 +1180,11 @@ export type ExportFormat = "mp4" | "gif" |
 /**
  * X02 (v1): chỉ âm thanh, MP3 (LAME).
  */
-"mp3"
+"mp3" | 
+/**
+ * X02 (v1): WebM (VP9 + Opus) giữ nền trong suốt.
+ */
+"webm"
 export type ExportJobInfo = { jobId: string; state: JobState; output: string; projectName: string }
 export type ExportQuality = "standard" | "high" | "max"
 export type ExportSettings = { format: ExportFormat; 
@@ -1115,7 +1207,11 @@ overwrite: boolean;
 /**
  * K-X2: chấp nhận thay đoạn thiếu media bằng khung trống.
  */
-allowBlackFill: boolean }
+allowBlackFill: boolean; 
+/**
+ * X05 (v1): ghi kèm phụ đề `.srt` cạnh file xuất (thời gian theo đoạn xuất).
+ */
+subtitles?: boolean }
 export type ExportWarning = 
 /**
  * GIF ước tính quá lớn: gợi ý giảm fps / kích thước / độ dài.

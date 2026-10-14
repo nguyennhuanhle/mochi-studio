@@ -122,5 +122,24 @@ pub async fn run() -> anyhow::Result<()> {
     );
     println!("  E12 wipe ra t=11.5 s: trái (200,360) sáng {}, phải (1100,360) sáng {} (nửa phải đã bị wipe)", lum("11.50", 200, 360), lum("11.50", 1100, 360));
     println!("  ảnh: {}", frames.display());
+
+    // X02 (v1): WebM nền trong suốt — project chỉ có chữ + mũi tên (không có video nền).
+    let adir = root.join("Alpha.mochi");
+    let mut a = EditorSession::create(&adir, "Alpha").map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    ap(&mut a, EditOp::SetCanvas { width: 640, height: 360 })?;
+    ap(&mut a, EditOp::AddOverlay { content: ClipContent::Text { text: "Trong suốt".into(), font: "Segoe UI".into(), size_px: 48.0, color: "#FFFFFF".into(), background: Some("#E2557BFF".into()) }, start: secs(0.0), duration: secs(1.0), track_id: None })?;
+    ap(&mut a, EditOp::AddOverlay { content: ClipContent::Shape { shape: ShapeKind::Arrow, x0: 0.1, y0: 0.2, x1: 0.4, y1: 0.4, stroke: "#FFD54A".into(), stroke_width: 8.0, fill: None }, start: secs(0.0), duration: secs(1.0), track_id: None })?;
+    a.save(false).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    drop(a);
+    let webm = root.join("alpha.webm");
+    let st = Command::new(std::env::current_exe()?).arg("export").arg(&adir).arg("--out").arg(&webm).args(["--format", "webm", "--short", "360", "--overwrite"]).output()?;
+    anyhow::ensure!(st.status.success(), "xuất webm lỗi: {}", String::from_utf8_lossy(&st.stdout));
+    let dec = Command::new("ffmpeg")
+        .args(["-v", "error", "-c:v", "libvpx-vp9", "-i"])
+        .arg(&webm)
+        .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"])
+        .output()?;
+    let px = |x: usize, y: usize| dec.stdout.get((y * 640 + x) * 4 + 3).copied();
+    println!("  X02 WebM: {} byte; alpha góc (5,5) = {:?}, giữa chữ (320,306) = {:?}", std::fs::metadata(&webm)?.len(), px(5, 5), px(320, 306));
     Ok(())
 }

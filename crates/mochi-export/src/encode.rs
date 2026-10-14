@@ -45,6 +45,12 @@ fn options(name: &str, fps: u32) -> Dictionary<'static> {
             o.set("preset", "medium");
             o.set("g", &gop);
         }
+        "libvpx-vp9" => {
+            o.set("deadline", "good");
+            o.set("cpu-used", "4");
+            o.set("row-mt", "1");
+            o.set("auto-alt-ref", "0");
+        }
         _ => {}
     }
     o
@@ -79,7 +85,10 @@ impl VideoEncoder {
             .formats()
             .and_then(|mut f| {
                 let all: Vec<_> = f.by_ref().collect();
-                [format::Pixel::NV12, format::Pixel::YUV420P].into_iter().find(|p| all.contains(p))
+                // X02 (v1): VP9 giữ kênh alpha (WebM nền trong suốt).
+                let prefer: &[format::Pixel] =
+                    if name == "libvpx-vp9" { &[format::Pixel::YUVA420P, format::Pixel::YUV420P] } else { &[format::Pixel::NV12, format::Pixel::YUV420P] };
+                prefer.iter().copied().find(|p| all.contains(p))
             })
             .unwrap_or(format::Pixel::YUV420P);
 

@@ -42,6 +42,7 @@ pub fn settings(output: &Path) -> ExportSettings {
         output: output.to_path_buf(),
         overwrite: false,
         allow_black_fill: false,
+        subtitles: true,
     }
 }
 

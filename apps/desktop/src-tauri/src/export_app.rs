@@ -108,6 +108,37 @@ pub async fn export_start(
     settings: ExportSettings,
 ) -> Result<ExportJobInfo, ExportError> {
     let (project, paths) = snapshot(&editor)?;
+    enqueue(&app, &exports, project, paths, settings).await
+}
+
+/// X06 (v1): xuất một project KHÁC project đang mở (xuất hàng loạt): mở gói ở chế độ đọc (giữ khóa
+/// trong lúc chụp), chụp project + đường dẫn media rồi đóng ngay; job chạy như mọi job xuất khác.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_project_file(
+    app: AppHandle,
+    exports: State<'_, ExportAppState>,
+    dir: PathBuf,
+    settings: ExportSettings,
+) -> Result<ExportJobInfo, ExportError> {
+    let (project, paths) = tokio::task::spawn_blocking(move || {
+        let s = mochi_editor::EditorSession::open(&dir).map_err(|e| ExportError::internal(e.to_string()))?;
+        let p = s.project().clone();
+        let paths: HashMap<String, PathBuf> = p.media.iter().filter_map(|m| s.media_path(&m.id).map(|x| (m.id.clone(), x))).collect();
+        Ok::<_, ExportError>((p, paths))
+    })
+    .await
+    .map_err(ExportError::internal)??;
+    enqueue(&app, &exports, project, paths, settings).await
+}
+
+async fn enqueue(
+    app: &AppHandle,
+    exports: &ExportAppState,
+    project: mochi_project::Project,
+    paths: HashMap<String, PathBuf>,
+    settings: ExportSettings,
+) -> Result<ExportJobInfo, ExportError> {
     let (project, paths, settings, est) = tokio::task::spawn_blocking(move || {
         mochi_export::preflight(&project, &paths, &settings).map(|est| (project, paths, settings, est))
     })
@@ -128,7 +159,7 @@ pub async fn export_start(
     let key = project_key(&job);
     let (state, to_run) = exports.queue.lock().unwrap().push(&key, &id, job);
     if let Some(job) = to_run {
-        launch(&app, job);
+        launch(app, job);
     }
     tracing::info!("job xuất {id} → {} ({state:?})", est.output.display());
     Ok(ExportJobInfo { job_id: id, state, output: est.output, project_name })
@@ -204,6 +235,7 @@ pub async fn export_pick_path(app: AppHandle, current: PathBuf, format: mochi_ex
         ExportFormat::Gif => ("GIF", "gif"),
         ExportFormat::M4a => ("M4A", "m4a"),
         ExportFormat::Mp3 => ("MP3", "mp3"),
+        ExportFormat::Webm => ("WebM", "webm"),
         ExportFormat::Mp4 => ("MP4", "mp4"),
     };
     let mut dialog = app.dialog().file().add_filter(label, &[ext]);

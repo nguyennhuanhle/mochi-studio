@@ -1,0 +1,15 @@
+[package]
+name = "mochi-captions"
+description = "Phụ đề local của Mochi Studio (E13 / S07): phiên âm bằng whisper.cpp, SRT / VTT"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+whisper-rs = "0.16"
+anyhow = { workspace = true }
+serde = { workspace = true }
+specta = { workspace = true }
+tracing = { workspace = true }

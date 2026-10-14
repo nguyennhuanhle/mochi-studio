@@ -6,6 +6,7 @@ import { useOpenProject } from "../lib/useOpenProject";
 import mochiMark from "../assets/mochi-mark.png";
 import GpuWarning from "../components/GpuWarning";
 import CachePanel from "../components/CachePanel";
+import BatchExportDialog from "../components/BatchExportDialog";
 
 export default function Home() {
   const { t, i18n } = useTranslation();
@@ -14,6 +15,7 @@ export default function Home() {
   /** S02: project lần trước không đóng sạch (crash) → đề nghị mở lại để khôi phục. */
   const [unclean, setUnclean] = useState<string[]>([]);
   const [unpackError, setUnpackError] = useState<string | null>(null);
+  const [batch, setBatch] = useState(false);
   const [version, setVersion] = useState("");
   useEffect(() => {
     commands.appVersion().then(setVersion);
@@ -67,6 +69,10 @@ export default function Home() {
         >
           {t("home.openZip")}
         </button>
+        {/* X06 (v1): xuất hàng loạt các project gần đây. */}
+        <button disabled={recent.length === 0} onClick={() => setBatch(true)}>
+          {t("batch.open")}
+        </button>
         <button
           onClick={async () => {
             const r = await commands.projectCreate(`Mochi ${new Date().toLocaleDateString()}`);
@@ -81,6 +87,7 @@ export default function Home() {
           {t("home.unpackFailed", { detail: unpackError })}
         </div>
       )}
+      {batch && <BatchExportDialog projects={recent} onClose={() => setBatch(false)} />}
       <GpuWarning />
       {/* S08 (v1): kiểm tra cập nhật — chỉ mở trang Releases, app không tự kết nối mạng. */}
       <p className="muted small row">

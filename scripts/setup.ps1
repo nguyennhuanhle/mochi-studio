@@ -76,6 +76,17 @@ if (-not (Test-Path (Join-Path $OrtDir 'onnxruntime.dll'))) {
   Copy-Item -Force (Join-Path $OrtExtract 'LICENSE') (Join-Path $OrtDir 'ONNXRUNTIME-LICENSE.txt') -ErrorAction SilentlyContinue
 } else { Write-Host '  (đã có) ONNX Runtime' }
 
+# ---------- CMake (portable) để build whisper.cpp cho phụ đề local (E13) ----------
+$CmakeDir = Join-Path $NativeDeps 'cmake'
+Write-Host '[2c/4] CMake 4.4.4 (portable)'
+if (-not (Test-Path (Join-Path $CmakeDir 'bin\cmake.exe'))) {
+  $CmakeZip = Join-Path $Target 'cmake-4.4.4-windows-x86_64.zip'
+  Get-Download 'https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip' $CmakeZip
+  $CmakeExtract = Join-Path $Target 'cmake-pkg'
+  Expand-Archive -Path $CmakeZip -DestinationPath $CmakeExtract -Force
+  Copy-Item -Recurse -Force (Join-Path $CmakeExtract 'cmake-4.4.4-windows-x86_64') $CmakeDir
+} else { Write-Host '  (đã có) CMake' }
+
 # ---------- libclang ----------
 Write-Host '[3/4] libclang'
 $ClangCandidates = @(
@@ -106,6 +117,7 @@ $LibclangToml = $LibclangDir -replace '\\', '/'
 [env]
 FFMPEG_DIR = { relative = true, force = true, value = "target/native-deps" }
 LIBCLANG_PATH = "$LibclangToml"
+CMAKE = { relative = true, force = true, value = "target/native-deps/cmake/bin/cmake.exe" }
 "@ | Out-File -Encoding ascii (Join-Path $CargoDir 'config.toml')
 
 foreach ($profile in 'debug', 'release') {

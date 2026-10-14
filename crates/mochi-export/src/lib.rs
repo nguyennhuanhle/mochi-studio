@@ -5,6 +5,7 @@
 //! - `job`: render → encode, chạy ở tiến trình con (`child`).
 //! - `queue`: mỗi project một lần xuất chạy cùng lúc.
 
+pub mod audio_enc;
 pub mod caps;
 pub mod child;
 pub mod encode;

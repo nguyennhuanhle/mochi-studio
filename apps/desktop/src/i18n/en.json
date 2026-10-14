@@ -388,7 +388,10 @@
       "crashed": "The export process stopped unexpectedly. Log: {{log}}"
     },
     "audioOnly": "audio only",
-    "summaryAudio": "Audio only · {{secs}} s · about {{size}}"
+    "summaryAudio": "Audio only · {{secs}} s · about {{size}}",
+    "subtitles": "Also save a .srt subtitle file next to the video",
+    "webmAlpha": "transparent background",
+    "byMarkers": "One file per marker ({{n}} files)"
   },
   "jobs": {
     "proxyQueued": "Waiting to build proxy",
@@ -645,5 +648,56 @@
     "ungroup": "Ungroup",
     "hint": "Ctrl+click to select more clips, then group them — grouped clips move and delete together",
     "member": "Part of a group"
+  },
+  "captions": {
+    "title": "Captions",
+    "generate": "Auto-generate captions (Whisper on this computer)",
+    "model": "Model",
+    "model_tiny": "Fast (tiny)",
+    "model_base": "Balanced (base)",
+    "model_small": "More accurate (small)",
+    "language": "Language",
+    "lang_auto": "Auto-detect",
+    "lang_vi": "Vietnamese",
+    "lang_en": "English",
+    "start": "Generate captions",
+    "regenerate": "Regenerate (replace current captions)",
+    "stage_download": "Downloading model… {{pct}}%",
+    "stage_audio": "Preparing audio… {{pct}}%",
+    "stage_transcribe": "Transcribing… {{pct}}%",
+    "nothing": "No speech was recognized.",
+    "downloadFailed": "Couldn't download the model: {{detail}}. Everything else in the app keeps working.",
+    "privacy": "Audio is processed on this computer and never uploaded. Only the model file is downloaded (once), when you agree.",
+    "lines": "Caption lines ({{n}})",
+    "import": "Import SRT / VTT…",
+    "exportSrt": "Export .srt…",
+    "exportVtt": "Export .vtt…",
+    "delete": "Delete line",
+    "add": "+ Add a line at {{at}}",
+    "newLine": "New caption",
+    "style": "Caption style",
+    "visible": "Show captions in the video (burn-in)",
+    "animated": "Animated captions: highlight the spoken word",
+    "highlight": "Spoken word color",
+    "size": "Font size (% of frame height)",
+    "position": "Vertical position",
+    "color": "Text color",
+    "background": "Background behind text",
+    "downloadTitle": "Download the speech recognition model?",
+    "downloadBody": "The {{model}} model ({{size}}) is downloaded once from huggingface.co to transcribe on this computer. Only the model is downloaded; your audio is never sent anywhere.",
+    "downloadConfirm": "Download ({{size}})"
+  },
+  "batch": {
+    "open": "Batch export…",
+    "title": "Batch export",
+    "start": "Export {{n}} projects",
+    "preset_youtube": "MP4 1080p",
+    "preset_uhd": "MP4 4K",
+    "preset_gif": "Light GIF (480p)",
+    "preset_mp3": "Audio only (MP3)",
+    "preset_webm": "WebM, transparent background",
+    "queued": "queued",
+    "failed": "failed: {{code}}",
+    "hint": "Each project becomes an export job in the queue (progress at the bottom). File name = project name."
   }
 }

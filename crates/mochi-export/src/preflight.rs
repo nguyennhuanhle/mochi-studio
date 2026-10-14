@@ -53,6 +53,11 @@ pub fn estimate_bytes(s: &ExportSettings, w: u32, h: u32, frames: u32, has_audio
             ((v + a) * secs / 8.0) as u64
         }
         ExportFormat::M4a | ExportFormat::Mp3 => (audio_bitrate(s.quality) as f64 * secs / 8.0) as u64,
+        // VP9 nén tốt hơn H.264 ~30 %; alpha thêm ~25 %.
+        ExportFormat::Webm => {
+            let v = video_bitrate(w, h, s.fps, s.quality, VideoCodec::H264) as f64 * 0.7 * 1.25;
+            ((v + if has_audio { 128_000.0 } else { 0.0 }) * secs / 8.0) as u64
+        }
         // gifski trên nội dung màn hình: ~0,12 byte/điểm ảnh/frame ở chất lượng cao.
         ExportFormat::Gif => {
             let bpp = match s.quality {
@@ -162,6 +167,10 @@ pub fn preflight(
                 });
             }
         }
+    }
+
+    if s.format == ExportFormat::Webm && ffmpeg::encoder::find_by_name("libvpx-vp9").is_none() {
+        return Err(ExportError::UnsupportedEncoder { codec: VideoCodec::H264, reason: "không có encoder VP9 (libvpx)".into() });
     }
 
     let dir = output.parent().map(|p| p.to_path_buf()).unwrap_or_default();

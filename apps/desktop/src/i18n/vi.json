@@ -388,7 +388,10 @@
       "crashed": "Tiến trình xuất dừng bất thường. Log: {{log}}"
     },
     "audioOnly": "chỉ âm thanh",
-    "summaryAudio": "Chỉ âm thanh · {{secs}} giây · khoảng {{size}}"
+    "summaryAudio": "Chỉ âm thanh · {{secs}} giây · khoảng {{size}}",
+    "subtitles": "Kèm file phụ đề .srt cạnh video",
+    "webmAlpha": "nền trong suốt",
+    "byMarkers": "Mỗi marker một file ({{n}} file)"
   },
   "jobs": {
     "proxyQueued": "Chờ tạo proxy",
@@ -645,5 +648,56 @@
     "ungroup": "Bỏ nhóm",
     "hint": "Ctrl+bấm để chọn thêm clip, rồi nhóm lại — clip cùng nhóm di chuyển / xóa cùng nhau",
     "member": "Thuộc một nhóm"
+  },
+  "captions": {
+    "title": "Phụ đề",
+    "generate": "Tạo phụ đề tự động (Whisper chạy trên máy)",
+    "model": "Model",
+    "model_tiny": "Nhanh (tiny)",
+    "model_base": "Cân bằng (base)",
+    "model_small": "Chính xác hơn (small)",
+    "language": "Ngôn ngữ",
+    "lang_auto": "Tự nhận",
+    "lang_vi": "Tiếng Việt",
+    "lang_en": "Tiếng Anh",
+    "start": "Tạo phụ đề",
+    "regenerate": "Tạo lại (thay phụ đề hiện có)",
+    "stage_download": "Đang tải model… {{pct}}%",
+    "stage_audio": "Đang chuẩn bị tiếng… {{pct}}%",
+    "stage_transcribe": "Đang phiên âm… {{pct}}%",
+    "nothing": "Không nhận ra lời nói nào.",
+    "downloadFailed": "Không tải được model: {{detail}}. Các phần khác của app vẫn dùng bình thường.",
+    "privacy": "Tiếng được xử lý ngay trên máy, không gửi lên mạng. Chỉ có tệp model được tải về (một lần) khi bạn đồng ý.",
+    "lines": "Các dòng phụ đề ({{n}})",
+    "import": "Nhập SRT / VTT…",
+    "exportSrt": "Xuất .srt…",
+    "exportVtt": "Xuất .vtt…",
+    "delete": "Xóa dòng",
+    "add": "+ Thêm dòng tại {{at}}",
+    "newLine": "Dòng phụ đề mới",
+    "style": "Kiểu phụ đề",
+    "visible": "Hiện phụ đề trong video (burn-in)",
+    "animated": "Phụ đề động: tô chữ đang nói",
+    "highlight": "Màu chữ đang nói",
+    "size": "Cỡ chữ (% chiều cao khung)",
+    "position": "Vị trí dọc",
+    "color": "Màu chữ",
+    "background": "Nền sau chữ",
+    "downloadTitle": "Tải model nhận dạng giọng nói?",
+    "downloadBody": "Cần tải model {{model}} ({{size}}) từ huggingface.co một lần để phiên âm trên máy. Chỉ tải model về; tiếng của bạn không được gửi đi đâu.",
+    "downloadConfirm": "Tải ({{size}})"
+  },
+  "batch": {
+    "open": "Xuất hàng loạt…",
+    "title": "Xuất hàng loạt",
+    "start": "Xuất {{n}} project",
+    "preset_youtube": "MP4 1080p",
+    "preset_uhd": "MP4 4K",
+    "preset_gif": "GIF nhẹ (480p)",
+    "preset_mp3": "Chỉ âm thanh (MP3)",
+    "preset_webm": "WebM nền trong suốt",
+    "queued": "đã vào hàng đợi",
+    "failed": "lỗi: {{code}}",
+    "hint": "Mỗi project thành một lần xuất trong hàng đợi (xem tiến độ ở góc dưới). Tên file = tên project."
   }
 }

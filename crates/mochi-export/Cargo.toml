@@ -10,6 +10,7 @@ publish = false
 mochi-project = { path = "../mochi-project" }
 mochi-render = { path = "../mochi-render" }
 mochi-preview = { path = "../mochi-preview" }
+mochi-captions = { path = "../mochi-captions" }
 mochi-recorder = { path = "../mochi-recorder" }
 cap-enc-ffmpeg = { path = "../../vendor/cap/crates/enc-ffmpeg" }
 cap-enc-gif = { path = "../../vendor/cap/crates/enc-gif" }

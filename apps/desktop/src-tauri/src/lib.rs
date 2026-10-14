@@ -1,6 +1,7 @@
 //! Mochi Studio — Tauri shell.
 //! Chỉ đăng ký command/event và quản lý cửa sổ; logic nằm ở các crate `mochi-*`.
 
+mod captions_app;
 mod dev_snapshot;
 mod editor_app;
 mod export_app;
@@ -76,6 +77,14 @@ fn specta_builder() -> tauri_specta::Builder {
             editor_app::player_save_frame,
             editor_app::project_pack,
             export_app::open_releases_page,
+            export_app::export_project_file,
+            captions_app::captions_models,
+            captions_app::captions_cpu_check,
+            captions_app::captions_cancel,
+            captions_app::captions_download,
+            captions_app::captions_generate,
+            captions_app::captions_export,
+            captions_app::captions_import,
             export_app::app_version,
             editor_app::project_unpack_pick,
             export_app::export_capabilities,
@@ -106,6 +115,7 @@ fn specta_builder() -> tauri_specta::Builder {
             editor_app::AutosaveStatus,
             editor_app::CloseSaveFailed,
             editor_app::PackProgress,
+            captions_app::CaptionsProgress,
             export_app::ExportEvent,
             jobs_app::JobsUpdate,
             jobs_app::CacheTrimmed

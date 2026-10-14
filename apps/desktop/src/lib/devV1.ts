@@ -29,6 +29,7 @@ export async function runV1(mode: string, c: Ctx) {
   if (mode === "v1b") await roundB(c);
   if (mode === "v1c") await roundC(c);
   if (mode === "v1d") await roundD(c);
+  if (mode === "v1e") await roundE(c);
 }
 
 /** Kéo một thanh trượt (theo nhãn) tới giá trị `v` rồi "thả" (sự kiện change). */
@@ -217,6 +218,85 @@ async function roundD({ navigate, outDir, snap, log, sleep }: Ctx) {
   } catch (e) {
     log.push(`v1d error: ${String(e)}`);
   }
+  const s = await commands.settingsGet();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
+}
+
+async function roundE({ navigate, outDir, snap, log, sleep }: Ctx) {
+  const root = outDir.replace(/[\\/]ui-snap.*$/, "");
+  const doneJobs: string[] = [];
+  const un = await events.exportEvent.listen(({ payload }) => {
+    if (payload.msg.type === "child" && (payload.msg.msg.type === "done" || payload.msg.msg.type === "failed")) {
+      doneJobs.push(JSON.stringify(payload.msg.msg).slice(0, 200));
+    }
+  });
+  try {
+    const open = await commands.projectOpen(`${root}/phase6/render/V1.mochi`);
+    if (open.status !== "ok") throw new Error(JSON.stringify(open.error));
+    navigate("/editor");
+    await sleep(5000);
+    const view = async () => (await commands.projectView())!;
+    // ---- E13: hộp thoại phụ đề ----
+    byText<HTMLButtonElement>(".editor-toolbar button", /💬/)?.click();
+    await sleep(1200);
+    log.push(`E13 hộp thoại: ${document.querySelectorAll(".caption-list li").length} dòng; model: ${[...document.querySelectorAll<HTMLOptionElement>(".captions-dialog select option")].slice(0, 3).map((o) => o.textContent).join(" | ")}`);
+    await snap("main", "v1e-1-captions");
+    byText<HTMLLabelElement>(".captions-dialog label.check", /phụ đề động|animated captions/i)?.querySelector("input")?.click();
+    await sleep(800);
+    log.push(`E13 kiểu: ${JSON.stringify((await view()).project.captionStyle)}`);
+    key("Escape");
+    await sleep(500);
+    // ---- X06: mỗi marker một file ----
+    await commands.timelineApply({ op: "addMarker", at: Math.round(2 * T), label: "Phần A" });
+    await commands.timelineApply({ op: "addMarker", at: Math.round(6 * T), label: "Phần B" });
+    navigate("/");
+    await sleep(300);
+    navigate("/editor");
+    await sleep(2500);
+    key("e", true);
+    await sleep(1500);
+    const rangeSel = byText<HTMLElement>(".dialog span", /phạm vi|range/i)?.nextElementSibling as HTMLSelectElement | null;
+    if (rangeSel) {
+      rangeSel.value = "markers";
+      rangeSel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const fmt = byText<HTMLElement>(".dialog span", /định dạng|format/i)?.nextElementSibling as HTMLSelectElement | null;
+    if (fmt) {
+      fmt.value = "webm";
+      fmt.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const res = byText<HTMLElement>(".dialog span", /độ phân giải|resolution/i)?.nextElementSibling as HTMLSelectElement | null;
+    if (res) {
+      res.value = "360";
+      res.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const pathBox = document.querySelector<HTMLInputElement>(".export-path input");
+    if (pathBox) setInput(pathBox, `${outDir}\markers.webm`);
+    await sleep(1500);
+    const over = byText<HTMLLabelElement>(".export-est label.check", /ghi đè|overwrite/i)?.querySelector("input");
+    if (over && !over.checked) over.click();
+    await sleep(1200);
+    log.push(`X06 hộp thoại: ${rangeSel?.selectedOptions[0]?.textContent}; ${document.querySelector(".export-est")?.textContent}`);
+    await snap("main", "v1e-2-export-markers");
+    document.querySelector<HTMLButtonElement>(".dialog-actions button.primary")?.click();
+    for (let i = 0; i < 240 && doneJobs.length < 3; i++) await sleep(500);
+    log.push(`X06 job xong: ${doneJobs.length} → ${doneJobs.join(" || ")}`);
+    await commands.projectClose(true);
+    navigate("/");
+    await sleep(800);
+    // ---- X06: xuất một project khác (không mở) ----
+    const before = doneJobs.length;
+    const r = await commands.exportProjectFile(`${root}/phase6/audio/Am.mochi`, {
+      format: "mp3", codec: "h264", shortSide: 720, fps: 30, quality: "high", range: null,
+      output: `${outDir}\batch-Am.mp3`, overwrite: true, allowBlackFill: false, subtitles: false,
+    });
+    log.push(`X06 project khác: ${r.status === "ok" ? r.data.state : JSON.stringify(r.error)}`);
+    for (let i = 0; i < 120 && doneJobs.length === before; i++) await sleep(500);
+    log.push(`X06 kết quả: ${doneJobs.slice(before).join(" || ")}`);
+  } catch (e) {
+    log.push(`v1e error: ${String(e)}`);
+  }
+  un();
   const s = await commands.settingsGet();
   await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
 }

@@ -21,6 +21,7 @@ import Timeline from "../components/Timeline";
 import { editorErrorMessage, formatTimecode, TICKS_PER_SECOND } from "../lib/editor";
 import ExportDialog from "../components/ExportDialog";
 import MarkersDialog from "../components/MarkersDialog";
+import CaptionsDialog from "../components/CaptionsDialog";
 import BrandDialog from "../components/BrandDialog";
 import { brandFont } from "../lib/brand";
 import SaveFailedDialog from "../components/SaveFailedDialog";
@@ -66,6 +67,7 @@ export default function Editor() {
   const [exporting, setExporting] = useState(false);
   const [showMarkers, setShowMarkers] = useState(false);
   const [showBrand, setShowBrand] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(false);
   const [packing, setPacking] = useState<{ done: number; total: number } | null>(null);
   const [closeError, setCloseError] = useState<EditorError | null>(null);
   const viewRef = useRef(view);
@@ -629,6 +631,9 @@ export default function Editor() {
         <button onClick={() => setShowBrand(true)} title={t("brand.title")}>
           🎨
         </button>
+        <button onClick={() => setShowCaptions(true)} title={t("captions.title")}>
+          💬 {view.project.captions?.length ?? 0}
+        </button>
         <span style={{ flex: 1 }} />
         <label className="row small">
           {t("polish.aspect")}
@@ -701,6 +706,9 @@ export default function Editor() {
 
       {exporting && <ExportDialog view={view} inOut={inOut} onClose={() => setExporting(false)} />}
       {showBrand && <BrandDialog onClose={() => setShowBrand(false)} />}
+      {showCaptions && (
+        <CaptionsDialog view={view} playhead={playhead} apply={apply} onClose={() => setShowCaptions(false)} onSeek={(at) => commands.playerSeek(at)} />
+      )}
       {showMarkers && (
         <MarkersDialog
           markers={view.project.markers ?? []}

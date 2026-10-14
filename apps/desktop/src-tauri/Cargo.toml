@@ -22,6 +22,7 @@ mochi-editor = { path = "../../../crates/mochi-editor" }
 mochi-render = { path = "../../../crates/mochi-render" }
 mochi-preview = { path = "../../../crates/mochi-preview" }
 mochi-export = { path = "../../../crates/mochi-export" }
+mochi-captions = { path = "../../../crates/mochi-captions" }
 mochi-jobs = { path = "../../../crates/mochi-jobs" }
 uuid = { version = "1.11.1", features = ["v4"] }
 base64 = "0.22"

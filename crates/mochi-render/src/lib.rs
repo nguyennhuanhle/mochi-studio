@@ -193,6 +193,8 @@ pub struct Renderer {
     text: Option<TextRasterizer>,
     /// Ảnh chữ / hình khối / callout đã vẽ (theo nội dung + độ phân giải).
     raster_cache: HashMap<String, (GpuFrame, [f32; 2])>,
+    /// X02 (v1): nền khung trong suốt (xuất WebM alpha) thay vì đen.
+    transparent: bool,
 }
 
 /// Thông tin một lần render (để đo hiệu năng / hiển thị).
@@ -296,7 +298,13 @@ impl Renderer {
             failed: HashMap::new(),
             text: None,
             raster_cache: HashMap::new(),
+            transparent: false,
         }
+    }
+
+    /// X02 (v1): vùng không có lớp nào = trong suốt (WebM alpha).
+    pub fn set_transparent(&mut self, on: bool) {
+        self.transparent = on;
     }
 
     pub fn gpu(&self) -> &GpuContext {
@@ -402,9 +410,53 @@ impl Renderer {
                 self.clip_layers(project, c, m, paths, t, exact, (cw, ch), scale, &mut layers, &mut stats).await;
             }
         }
+        // E13 / X05 (v1): phụ đề "đốt" vào hình khi bật hiện.
+        if let Some(layer) = self.caption_layer(project, t, (cw, ch)) {
+            layers.push(layer);
+        }
         stats.layers = layers.len();
         self.draw(&output, &layers);
         (output, stats)
+    }
+
+    fn caption_layer(&mut self, project: &Project, t: Ticks, (cw, ch): (u32, u32)) -> Option<Layer> {
+        let style = &project.caption_style;
+        if !style.visible {
+            return None;
+        }
+        let cap = project.captions.iter().find(|c| c.start <= t && t < c.end)?;
+        let base = if mochi_project::is_hex_color(&style.color) { style.color.as_str() } else { "#FFFFFF" };
+        let hi = if mochi_project::is_hex_color(&style.highlight) { style.highlight.as_str() } else { "#FFD54A" };
+        // Phụ đề động: tô chữ đang nói (chữ cuối cùng đã bắt đầu).
+        let current = if style.animated && !cap.words.is_empty() {
+            cap.words.iter().rposition(|w| w.start <= t)
+        } else {
+            None
+        };
+        let words: Vec<String> = if cap.words.is_empty() { vec![cap.text.clone()] } else { cap.words.iter().map(|w| w.text.clone()).collect() };
+        let joined: Vec<(String, &str)> = words
+            .iter()
+            .enumerate()
+            .map(|(i, w)| (if i + 1 < words.len() { format!("{w} ") } else { w.clone() }, if Some(i) == current { hi } else { base }))
+            .collect();
+        let size = (style.size.clamp(2.0, 10.0) / 100.0 * ch as f64) as f32;
+        let font = if style.font.trim().is_empty() { "Segoe UI" } else { style.font.as_str() };
+        let bg = style.background.as_deref().filter(|b| mochi_project::is_hex_color(b));
+        let key = format!("cap|{}|{current:?}|{font}|{size}|{base}|{hi}|{bg:?}|{cw}", cap.id);
+        let frame = if let Some((f, _)) = self.raster_cache.get(&key) {
+            f.clone()
+        } else {
+            let spans: Vec<(&str, &str)> = joined.iter().map(|(s, c)| (s.as_str(), *c)).collect();
+            let raster = self.text.get_or_insert_with(TextRasterizer::new);
+            let (w, h, rgba) = raster.rasterize_spans(&spans, font, size, base, bg, cw as f32 * 0.86, true);
+            let f = GpuFrame::whole(upload_rgba(&self.gpu, &rgba, w, h, "mochi-caption").create_view(&Default::default()), w, h);
+            self.raster_cache.insert(key, (f.clone(), [0.0, 0.0]));
+            f
+        };
+        let (fw, fh) = (cw as f32, ch as f32);
+        let y = (style.y.clamp(0.05, 0.95) as f32 * fh).clamp(frame.height as f32 / 2.0, fh - frame.height as f32 / 2.0);
+        let q = Quad::new(Mode::Image, [fw / 2.0, y], [frame.width as f32 / 2.0, frame.height as f32 / 2.0]);
+        Some(Layer::Quad { frame: Some(frame), q })
     }
 
     /// Lớp của một clip tại `t` (đã áp keyframe, chuyển cảnh, màu & khung).
@@ -756,7 +808,11 @@ impl Renderer {
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: if first { wgpu::LoadOp::Clear(wgpu::Color::BLACK) } else { wgpu::LoadOp::Load },
+                            load: if first {
+                                wgpu::LoadOp::Clear(if self.transparent { wgpu::Color::TRANSPARENT } else { wgpu::Color::BLACK })
+                            } else {
+                                wgpu::LoadOp::Load
+                            },
                             store: wgpu::StoreOp::Store,
                         },
                     })],

@@ -26,20 +26,50 @@ impl TextRasterizer {
         background: Option<&str>,
         max_width: f32,
     ) -> (u32, u32, Vec<u8>) {
+        let text = if text.is_empty() { " " } else { text };
+        self.rasterize_spans(&[(text, color)], font, size_px, color, background, max_width, false)
+    }
+
+    /// Như `rasterize` nhưng mỗi đoạn một màu (phụ đề động tô chữ đang nói); `center` = căn giữa dòng.
+    #[allow(clippy::too_many_arguments)]
+    pub fn rasterize_spans(
+        &mut self,
+        spans: &[(&str, &str)],
+        font: &str,
+        size_px: f32,
+        color: &str,
+        background: Option<&str>,
+        max_width: f32,
+        center: bool,
+    ) -> (u32, u32, Vec<u8>) {
         let metrics = Metrics::new(size_px, size_px * 1.25);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
         buffer.set_size(&mut self.fonts, Some(max_width), None);
-        buffer.set_text(
-            &mut self.fonts,
-            if text.is_empty() { " " } else { text },
-            &Attrs::new().family(Family::Name(font)),
-            Shaping::Advanced,
-        );
+        let base = Attrs::new().family(Family::Name(font));
+        let rich: Vec<(&str, Attrs)> = spans
+            .iter()
+            .map(|(t, c)| {
+                let [r, g, b, a] = parse_rgba(c);
+                (*t, base.clone().color(Color::rgba(r, g, b, a)))
+            })
+            .collect();
+        let align = center.then_some(cosmic_text::Align::Center);
+        buffer.set_rich_text(&mut self.fonts, rich, &base, Shaping::Advanced, align);
         buffer.shape_until_scroll(&mut self.fonts, false);
-        let (mut tw, mut th) = (0f32, 0f32);
-        for run in buffer.layout_runs() {
-            tw = tw.max(run.line_w);
-            th = th.max(run.line_top + run.line_height);
+        let measure = |buffer: &Buffer| {
+            let (mut tw, mut th) = (0f32, 0f32);
+            for run in buffer.layout_runs() {
+                tw = tw.max(run.line_w);
+                th = th.max(run.line_top + run.line_height);
+            }
+            (tw, th)
+        };
+        let (mut tw, mut th) = measure(&buffer);
+        if center {
+            // Căn giữa trong đúng bề rộng của chữ (không phải `max_width`) để ảnh không thừa lề.
+            buffer.set_size(&mut self.fonts, Some(tw.ceil().max(1.0)), None);
+            buffer.shape_until_scroll(&mut self.fonts, false);
+            (tw, th) = measure(&buffer);
         }
         let pad = if background.is_some() { (size_px * 0.4).round() } else { 2.0 };
         let (w, h) = ((tw + pad * 2.0).ceil().max(1.0) as u32, (th + pad * 2.0).ceil().max(1.0) as u32);

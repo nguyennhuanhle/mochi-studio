@@ -108,6 +108,7 @@ pub async fn run(job: &ExportJob, cancel: &AtomicBool, on_msg: &mut dyn FnMut(Ch
         ExportFormat::Gif => ctx.gif(&partial).await.map(|()| "gifski".to_string()),
         ExportFormat::Mp4 => ctx.mp4_with_fallback(&partial).await,
         ExportFormat::M4a => ctx.audio_only(&partial, false).await,
+        ExportFormat::Webm => ctx.webm(&partial).await.map(|()| "libvpx-vp9".to_string()),
         ExportFormat::Mp3 => ctx.audio_only(&partial, true).await,
     };
     let encoder = match result {
@@ -125,6 +126,24 @@ pub async fn run(job: &ExportJob, cancel: &AtomicBool, on_msg: &mut dyn FnMut(Ch
         std::fs::remove_file(&job.output).map_err(ExportError::internal)?;
     }
     std::fs::rename(&partial, &job.output).map_err(ExportError::internal)?;
+    // X05: phụ đề kèm theo (mốc tính từ đầu đoạn xuất; dòng ngoài đoạn bị bỏ, dòng vắt qua bị cắt).
+    if s.subtitles && !job.project.captions.is_empty() {
+        let caps: Vec<mochi_project::Caption> = job
+            .project
+            .captions
+            .iter()
+            .filter(|c| c.end > range.start && c.start < range.end)
+            .map(|c| mochi_project::Caption {
+                start: Ticks((c.start.0.max(range.start.0)) - range.start.0),
+                end: Ticks(c.end.0.min(range.end.0) - range.start.0),
+                ..c.clone()
+            })
+            .collect();
+        let srt = job.output.with_extension("srt");
+        if let Err(e) = std::fs::write(&srt, mochi_captions::subtitles::to_srt(&caps)) {
+            tracing::warn!("không ghi được {}: {e}", srt.display());
+        }
+    }
     let bytes = std::fs::metadata(&job.output).map(|m| m.len()).unwrap_or(0);
     Ok(ChildMsg::Done { path: job.output.clone(), bytes, secs: started.elapsed().as_secs_f32(), encoder })
 }
@@ -353,6 +372,49 @@ impl Ctx<'_> {
         write_packets(&mut enc, &mut out)?;
         out.write_trailer().map_err(ExportError::internal)?;
         Ok(encoder)
+    }
+
+    /// X02 (v1): WebM VP9 có kênh alpha (vùng không có lớp nào = trong suốt) + tiếng Opus.
+    async fn webm(&mut self, partial: &Path) -> Result<(), ExportError> {
+        let s = self.job.settings.clone();
+        let (w, h) = (self.width, self.height);
+        let dir = partial.parent().unwrap_or(Path::new(".")).to_path_buf();
+        let mixer = OfflineMixer::new(Arc::new(self.job.project.clone()), &self.job.paths);
+        let mut out = ffmpeg::format::output_as(partial, "webm").map_err(|e| ExportError::NotWritable { dir: dir.clone() }.log(e))?;
+        let bitrate = (video_bitrate(w, h, s.fps, s.quality, VideoCodec::H264) as f64 * 0.9) as u64;
+        let mut video = VideoEncoder::open(&mut out, "libvpx-vp9", w, h, s.fps, bitrate)
+            .map_err(|message| ExportError::Encoder { message, hardware: false })?;
+        let mut audio = if mixer.has_audio() {
+            Some(crate::audio_enc::AudioEncoder::open(&mut out, "libopus", OfflineMixer::RATE, 128_000).map_err(ExportError::internal)?)
+        } else {
+            None
+        };
+        out.write_header().map_err(ExportError::internal)?;
+        self.renderer.set_transparent(true);
+        (self.on_msg)(ChildMsg::Started { encoder: "libvpx-vp9".into(), hardware: false, width: w, height: h, frames: self.frames });
+        let rate = OfflineMixer::RATE as u64;
+        let mut pcm = Vec::new();
+        let started = Instant::now();
+        let mut last = Instant::now() - Duration::from_secs(1);
+        for i in 0..self.frames {
+            self.check(i, &dir, std::fs::metadata(partial).map(|m| m.len()).unwrap_or(0))?;
+            let rgba = self.frame_rgba(i).await;
+            video.push_rgba(&rgba, i as i64, &mut out).map_err(|message| ExportError::Encoder { message, hardware: false })?;
+            if let Some(a) = audio.as_mut() {
+                let s0 = i as u64 * rate / s.fps as u64;
+                let s1 = (i as u64 + 1) * rate / s.fps as u64;
+                pcm.resize(((s1 - s0) * 2) as usize, 0.0);
+                mixer.fill(Ticks(self.range.start.0 + s0 as i64 * OfflineMixer::TICKS_PER_SAMPLE), &mut pcm);
+                a.push(&pcm, &mut out).map_err(ExportError::internal)?;
+            }
+            self.progress(i, started, &mut last);
+        }
+        video.finish(&mut out).map_err(|message| ExportError::Encoder { message, hardware: false })?;
+        if let Some(a) = audio.as_mut() {
+            a.finish(&mut out).map_err(ExportError::internal)?;
+        }
+        out.write_trailer().map_err(ExportError::internal)?;
+        Ok(())
     }
 
     async fn gif(&mut self, partial: &Path) -> Result<(), ExportError> {

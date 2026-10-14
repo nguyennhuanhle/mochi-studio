@@ -43,6 +43,11 @@ pub enum EditOp {
         #[serde(default)]
         magnetic: Option<bool>,
     },
+    /// E13 (v1): thay toàn bộ phụ đề (sau phiên âm, nhập SRT / VTT, hoặc sửa tay).
+    #[serde(rename_all = "camelCase")]
+    SetCaptions { captions: Vec<mochi_project::Caption> },
+    #[serde(rename_all = "camelCase")]
+    SetCaptionStyle { style: mochi_project::CaptionStyle },
     /// E11 (v1): khử ồn / chuẩn hóa / nén của clip.
     #[serde(rename_all = "camelCase")]
     SetAudioFx { clip_id: String, fx: mochi_project::AudioFx },
@@ -200,6 +205,34 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             if let Some(v) = magnetic {
                 t.magnetic = *v;
             }
+        }
+        EditOp::SetCaptions { captions } => {
+            let mut caps: Vec<mochi_project::Caption> = captions
+                .iter()
+                .filter(|c| c.end > c.start && !c.text.trim().is_empty())
+                .take(20_000)
+                .cloned()
+                .map(|mut c| {
+                    c.start = c.start.max(Ticks::ZERO);
+                    c.text = c.text.trim().chars().take(500).collect();
+                    if c.id.is_empty() {
+                        c.id = uuid::Uuid::new_v4().to_string();
+                    }
+                    c
+                })
+                .collect();
+            caps.sort_by_key(|c| c.start);
+            p.captions = caps;
+        }
+        EditOp::SetCaptionStyle { style } => {
+            let mut s = style.clone();
+            s.size = finite(s.size, 4.5).clamp(2.0, 10.0);
+            s.y = finite(s.y, 0.88).clamp(0.05, 0.95);
+            s.color = color_or(s.color, "#FFFFFF");
+            s.highlight = color_or(s.highlight, "#FFD54A");
+            s.background = s.background.filter(|b| mochi_project::is_hex_color(b));
+            s.font = s.font.trim().chars().take(80).collect();
+            p.caption_style = s;
         }
         EditOp::SetAudioFx { clip_id, fx } => {
             ensure_clip_unlocked(p, clip_id)?;
