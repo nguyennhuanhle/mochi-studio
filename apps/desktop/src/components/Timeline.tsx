@@ -297,10 +297,24 @@ export default function Timeline(props: {
                           ? `T  ${c.content.text}`
                           : c.content.type === "blur"
                             ? `▦ ${c.content.pixelate ? "pixelate" : "blur"}`
-                            : media?.name}
+                            : c.content.type === "shape"
+                              ? `${{ rectangle: "▭", ellipse: "◯", arrow: "➚", line: "╱" }[c.content.shape]} ${t(`shape.${c.content.shape}`)}`
+                              : c.content.type === "callout"
+                                ? `💬 ${c.content.text}`
+                                : c.content.type === "spotlight"
+                                  ? `◎ ${t("spotlight.title")}`
+                                  : media?.name}
                         {c.speed !== 1 ? ` · ${c.speed}×` : ""}
                         {media && view.missing.includes(media.id) ? ` — ⚠ ${t("editor.missing")}` : ""}
                       </span>
+                      {/* E12: keyframe trên clip. */}
+                      {(c.keyframes ?? []).map((k) => (
+                        <span key={k.at} className="tl-kf" style={{ left: secs(k.at) * pxPerSec - 4 }} title={formatTimecode(k.at)}>
+                          ◆
+                        </span>
+                      ))}
+                      {c.transitionIn && <span className="tl-tr in" style={{ width: secs(c.transitionIn.duration) * pxPerSec }} title={t(`fx.tr_${c.transitionIn.kind}`)} />}
+                      {c.transitionOut && <span className="tl-tr out" style={{ width: secs(c.transitionOut.duration) * pxPerSec }} title={t(`fx.tr_${c.transitionOut.kind}`)} />}
                       {c.content.type === "recording" && c.content.fx?.camera.hiddenRanges.length && !dragging ? (
                         // E08: các đoạn ẩn webcam.
                         <div className="tl-camhide-band">

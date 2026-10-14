@@ -541,6 +541,67 @@ export default function Editor() {
         >
           {t("polish.addBlur")}
         </button>
+        {/* E10 (v1): hình khối, callout, spotlight. */}
+        <select
+          className="add-shape"
+          value=""
+          aria-label={t("shape.add")}
+          onChange={(e) => {
+            const shape = e.target.value as "rectangle" | "ellipse" | "arrow" | "line";
+            if (!shape) return;
+            const line = shape === "arrow" || shape === "line";
+            apply({
+              op: "addOverlay",
+              content: {
+                type: "shape",
+                shape,
+                x0: line ? 0.3 : 0.4,
+                y0: line ? 0.7 : 0.35,
+                x1: line ? 0.5 : 0.6,
+                y1: line ? 0.5 : 0.65,
+                stroke: "#E2557B",
+                strokeWidth: 8,
+                fill: null,
+              },
+              start: playhead,
+              duration: 3 * TICKS_PER_SECOND,
+              trackId: null,
+            });
+          }}
+        >
+          <option value="">{t("shape.add")}</option>
+          {(["rectangle", "ellipse", "arrow", "line"] as const).map((k) => (
+            <option key={k} value={k}>
+              {t(`shape.${k}`)}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() =>
+            apply({
+              op: "addOverlay",
+              content: { type: "callout", text: t("callout.default"), font: brandFont(), sizePx: 40, color: "#1D1B26", background: "#FFD54A", tailX: 0.35, tailY: 0.65 },
+              start: playhead,
+              duration: 3 * TICKS_PER_SECOND,
+              trackId: null,
+            })
+          }
+        >
+          {t("callout.add")}
+        </button>
+        <button
+          onClick={() =>
+            apply({
+              op: "addOverlay",
+              content: { type: "spotlight", x: 0.3, y: 0.25, width: 0.4, height: 0.5, ellipse: true, dim: 0.65 },
+              start: playhead,
+              duration: 3 * TICKS_PER_SECOND,
+              trackId: null,
+            })
+          }
+        >
+          {t("spotlight.add")}
+        </button>
         <span className="sep" />
         <button onClick={() => apply({ op: "addTrack", kind: "video" })}>{t("editor.addVideoTrack")}</button>
         <button onClick={() => apply({ op: "addTrack", kind: "audio" })}>{t("editor.addAudioTrack")}</button>

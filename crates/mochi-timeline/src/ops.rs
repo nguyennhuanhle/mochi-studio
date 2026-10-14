@@ -3,7 +3,8 @@ use crate::{
     not_found, track_accepts,
 };
 use mochi_project::{
-    Clip, ClipContent, MediaKind, Project, RecordingFx, Ticks, Track, TrackKind, Transform, ZoomSegment,
+    Clip, ClipContent, Keyframe, Look, MediaKind, Project, RecordingFx, Ticks, Track, TrackKind, Transform, Transition,
+    TransitionKind, ZoomSegment,
     ZoomTarget,
 };
 use serde::Deserialize;
@@ -80,6 +81,15 @@ pub enum EditOp {
     },
     #[serde(rename_all = "camelCase")]
     SetClipTransform { clip_id: String, transform: Transform },
+    /// E12 (v1): thay toàn bộ keyframe của clip (rỗng = bỏ keyframe, dùng transform tĩnh).
+    #[serde(rename_all = "camelCase")]
+    SetKeyframes { clip_id: String, keyframes: Vec<Keyframe> },
+    /// E12 (v1): chuyển cảnh vào (`out = false`) hoặc ra (`out = true`); None = bỏ.
+    #[serde(rename_all = "camelCase")]
+    SetTransition { clip_id: String, out: bool, transition: Option<Transition> },
+    /// E15 (v1): màu, viền, bo góc, bóng, khung thiết bị.
+    #[serde(rename_all = "camelCase")]
+    SetLook { clip_id: String, look: Look },
     /// E05–E08: thay toàn bộ hiệu ứng của một clip bản quay (K-E2: chỉ clip bản quay).
     #[serde(rename_all = "camelCase")]
     SetRecordingFx { clip_id: String, fx: RecordingFx },
@@ -253,6 +263,52 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             if let Some(v) = muted {
                 c.muted = *v;
             }
+        }
+        EditOp::SetKeyframes { clip_id, keyframes } => {
+            ensure_clip_unlocked(p, clip_id)?;
+            let c = clip_mut(p, clip_id)?;
+            let dur = c.duration();
+            let mut ks: Vec<Keyframe> = keyframes
+                .iter()
+                .take(200)
+                .map(|k| Keyframe {
+                    at: Ticks(k.at.0.clamp(0, dur.0)),
+                    x: finite(k.x, 0.5).clamp(-1.0, 2.0),
+                    y: finite(k.y, 0.5).clamp(-1.0, 2.0),
+                    scale: finite(k.scale, 1.0).clamp(0.05, 10.0),
+                    rotation: finite(k.rotation, 0.0).clamp(-3600.0, 3600.0),
+                    opacity: finite(k.opacity, 1.0).clamp(0.0, 1.0),
+                    easing: k.easing,
+                })
+                .collect();
+            ks.sort_by_key(|k| k.at);
+            // Hai keyframe cùng thời điểm → giữ cái sau.
+            ks.dedup_by(|b, a| a.at == b.at && { *a = *b; true });
+            c.keyframes = ks;
+        }
+        EditOp::SetTransition { clip_id, out, transition } => {
+            ensure_clip_unlocked(p, clip_id)?;
+            let c = clip_mut(p, clip_id)?;
+            let max = Ticks((c.duration().0 / 2).max(MIN_CLIP.0));
+            let tr = transition.map(|t| Transition { kind: t.kind, duration: Ticks(t.duration.0.clamp(MIN_CLIP.0, max.0.max(MIN_CLIP.0))) });
+            if matches!(tr, Some(Transition { kind: TransitionKind::Typewriter, .. }))
+                && !matches!(c.content, ClipContent::Text { .. } | ClipContent::Callout { .. })
+            {
+                return Err(TimelineError::Invalid { detail: "hiệu ứng gõ chữ chỉ dùng cho chữ / callout".into() });
+            }
+            if *out {
+                c.transition_out = tr;
+            } else {
+                c.transition_in = tr;
+            }
+        }
+        EditOp::SetLook { clip_id, look } => {
+            ensure_clip_unlocked(p, clip_id)?;
+            let c = clip_mut(p, clip_id)?;
+            if !matches!(c.content, ClipContent::Recording { .. } | ClipContent::Video | ClipContent::Image) {
+                return Err(TimelineError::EffectNotSupported);
+            }
+            c.look = look.clone().clamped();
         }
         EditOp::SetClipTransform { clip_id, transform } => {
             ensure_clip_unlocked(p, clip_id)?;
@@ -491,8 +547,47 @@ fn sanitize_overlay(content: ClipContent) -> ClipContent {
                 strength: strength.clamp(0.0, 1.0),
             }
         }
+        ClipContent::Shape { shape, x0, y0, x1, y1, stroke, stroke_width, fill } => ClipContent::Shape {
+            shape,
+            x0: finite(x0, 0.3).clamp(-0.5, 1.5),
+            y0: finite(y0, 0.3).clamp(-0.5, 1.5),
+            x1: finite(x1, 0.7).clamp(-0.5, 1.5),
+            y1: finite(y1, 0.7).clamp(-0.5, 1.5),
+            stroke: color_or(stroke, "#E2557B"),
+            stroke_width: finite(stroke_width, 6.0).clamp(1.0, 60.0),
+            fill: fill.filter(|f| mochi_project::is_hex_color(f)),
+        },
+        ClipContent::Callout { text, font, size_px, color, background, tail_x, tail_y } => ClipContent::Callout {
+            text: text.chars().take(500).collect(),
+            font: if font.trim().is_empty() { "Segoe UI".into() } else { font },
+            size_px: finite(size_px, 40.0).clamp(8.0, 200.0),
+            color: color_or(color, "#1D1B26"),
+            background: color_or(background, "#FFD54A"),
+            tail_x: finite(tail_x, 0.5).clamp(0.0, 1.0),
+            tail_y: finite(tail_y, 0.5).clamp(0.0, 1.0),
+        },
+        ClipContent::Spotlight { x, y, width, height, ellipse, dim } => {
+            let x = finite(x, 0.3).clamp(0.0, 1.0);
+            let y = finite(y, 0.3).clamp(0.0, 1.0);
+            ClipContent::Spotlight {
+                x,
+                y,
+                width: finite(width, 0.4).clamp(0.02, (1.0 - x).max(0.02)),
+                height: finite(height, 0.4).clamp(0.02, (1.0 - y).max(0.02)),
+                ellipse,
+                dim: finite(dim, 0.6).clamp(0.0, 1.0),
+            }
+        }
         other => other,
     }
+}
+
+fn finite(v: f64, d: f64) -> f64 {
+    if v.is_finite() { v } else { d }
+}
+
+fn color_or(c: String, d: &str) -> String {
+    if mochi_project::is_hex_color(&c) { c } else { d.into() }
 }
 
 /// Track loại `kind` còn trống ở [start, end) (không khóa); không có thì tạo mới (ở trên cùng).

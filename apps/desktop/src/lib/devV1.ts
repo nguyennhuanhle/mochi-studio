@@ -1,4 +1,4 @@
-import { commands, events } from "../bindings";
+﻿import { commands, events } from "../bindings";
 
 /**
  * Bài tự kiểm Phase 6 (use case v1) trong app — chỉ bản dev (MOCHI_UI_SNAPSHOT_MODE=v1a…).
@@ -26,6 +26,115 @@ const setInput = (el: HTMLInputElement, v: string) => {
 export async function runV1(mode: string, c: Ctx) {
   if (mode === "v1a") await roundA(c);
   if (mode === "v1r") await presetDebug(c);
+  if (mode === "v1b") await roundB(c);
+}
+
+/** Kéo một thanh trượt (theo nhãn) tới giá trị `v` rồi "thả" (sự kiện change). */
+function slide(label: RegExp, v: number, scope: ParentNode = document) {
+  const l = [...scope.querySelectorAll<HTMLLabelElement>("label.field")].find((x) => label.test(x.querySelector("span")?.textContent ?? ""));
+  const input = l?.querySelector<HTMLInputElement>("input[type=range]");
+  if (!input) return false;
+  setInput(input, String(v));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function choose(label: RegExp, value: string, scope: ParentNode = document) {
+  const l = [...scope.querySelectorAll<HTMLLabelElement>("label.field")].find((x) => label.test(x.querySelector("span")?.textContent ?? ""));
+  const sel = l?.querySelector<HTMLSelectElement>("select");
+  if (!sel) return false;
+  sel.value = value;
+  sel.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function openSection(title: RegExp) {
+  const s = [...document.querySelectorAll<HTMLDetailsElement>("details.insp-section")].find((d) => title.test(d.querySelector("summary")?.textContent ?? ""));
+  if (s) s.open = true;
+  return s ?? null;
+}
+
+async function roundB({ navigate, outDir, snap, log, sleep }: Ctx) {
+  const root = outDir.replace(/[\\/]ui-snap.*$/, "");
+  try {
+    const open = await commands.projectOpen(`${root}/phase6/render/V1.mochi`);
+    if (open.status !== "ok") throw new Error(JSON.stringify(open.error));
+    navigate("/editor");
+    await sleep(6000);
+    const view = async () => (await commands.projectView())!;
+    const p0 = (await view()).project;
+    const first = p0.clips.find((c) => c.content.type === "video" && c.start === 0)!;
+    select(first.id);
+    await commands.playerSeek(Math.round(0.5 * T));
+    await sleep(1200);
+    // ---- E12: xoay tĩnh → keyframe ----
+    const motion = openSection(/chuyển động|motion/i);
+    await sleep(300);
+    log.push(`E12 mục chuyển động: ${motion ? "có" : "KHÔNG"}`);
+    slide(/xoay|rotation/i, 12, motion ?? document);
+    await sleep(900);
+    log.push(`E12 xoay tĩnh: ${JSON.stringify((await view()).project.clips.find((c) => c.id === first.id)?.transform)}`);
+    byText<HTMLButtonElement>("button", /thêm keyframe|add keyframe/i)?.click();
+    await sleep(900);
+    await commands.playerSeek(Math.round(3.0 * T));
+    await sleep(900);
+    slide(/^(ngang|horizontal)/i, 0.3, openSection(/chuyển động|motion/i) ?? document);
+    slide(/xoay|rotation/i, -20, openSection(/chuyển động|motion/i) ?? document);
+    await sleep(900);
+    const kf = (await view()).project.clips.find((c) => c.id === first.id)?.keyframes ?? [];
+    log.push(`E12 keyframe: ${JSON.stringify(kf.map((k) => [+(k.at / T).toFixed(2), +k.x.toFixed(2), Math.round(k.rotation), k.easing]))}`);
+    log.push(`E12 ◆ trên timeline: ${document.querySelectorAll(".tl-kf").length}`);
+    // ---- E12: chuyển cảnh qua ô chọn ----
+    const trs = openSection(/chuyển cảnh|transitions/i);
+    await sleep(300);
+    choose(/^vào$|^in$/i, "zoom", trs ?? document);
+    await sleep(900);
+    log.push(`E12 chuyển cảnh vào: ${JSON.stringify((await view()).project.clips.find((c) => c.id === first.id)?.transitionIn)}`);
+    // ---- E15: khung thiết bị qua ô chọn ----
+    const look = openSection(/màu & khung|color & frame/i);
+    await sleep(300);
+    choose(/khung thiết bị|device frame/i, "phone", look ?? document);
+    await sleep(900);
+    slide(/độ bão hòa|saturation/i, -60, openSection(/màu & khung|color & frame/i) ?? document);
+    await sleep(900);
+    log.push(`E15 look: ${JSON.stringify((await view()).project.clips.find((c) => c.id === first.id)?.look)}`);
+    await commands.playerSeek(Math.round(2.0 * T));
+    await sleep(1800);
+    await snap("main", "v1b-1-keyframe-phone");
+    // ---- E10: thêm hình / callout / spotlight từ thanh công cụ ----
+    await commands.playerSeek(Math.round(5.0 * T));
+    await sleep(500);
+    const shapeSel = document.querySelector<HTMLSelectElement>("select.add-shape");
+    if (shapeSel) {
+      shapeSel.value = "arrow";
+      shapeSel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    await sleep(900);
+    byText<HTMLButtonElement>(".editor-toolbar button", /\+ callout/i)?.click();
+    await sleep(900);
+    byText<HTMLButtonElement>(".editor-toolbar button", /\+ spotlight/i)?.click();
+    await sleep(900);
+    const types = (await view()).project.clips.map((c) => c.content.type);
+    log.push(`E10 overlay sau khi thêm: ${JSON.stringify(types)}`);
+    const arrow = (await view()).project.clips.filter((c) => c.content.type === "shape").pop();
+    if (arrow) {
+      select(arrow.id);
+      await sleep(900);
+      slide(/độ dày nét|stroke width/i, 20);
+      await sleep(900);
+      const a2 = (await view()).project.clips.find((c) => c.id === arrow.id)!;
+      log.push(`E10 mũi tên: ${JSON.stringify(a2.content)}; nhãn timeline: ${[...document.querySelectorAll(".tl-clip-name")].map((e) => e.textContent?.trim()).filter((x) => /➚|💬|◎/.test(x ?? "")).join(" | ")}`);
+    }
+    await commands.playerSeek(Math.round(5.5 * T));
+    await sleep(1800);
+    await snap("main", "v1b-2-shapes");
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`v1b error: ${String(e)}`);
+  }
+  const s = await commands.settingsGet();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
 }
 
 async function presetDebug({ navigate, log, sleep }: Ctx) {

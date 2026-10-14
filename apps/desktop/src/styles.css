@@ -309,3 +309,12 @@ html.overlay-window, html.overlay-window body, html.overlay-window #root { backg
 .swatch { width: 18px; height: 18px; min-width: 0; padding: 0; border-radius: 4px; border: 1px solid var(--border); }
 .swatch.on { outline: 2px solid var(--accent); }
 .brand-colors { gap: 8px; }
+.tl-kf { position: absolute; bottom: 2px; font-size: 9px; color: #fff; text-shadow: 0 0 2px #000; pointer-events: none; }
+.tl-tr { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.tl-tr.in { left: 0; background: linear-gradient(90deg, rgba(255,255,255,0.35), transparent); }
+.tl-tr.out { right: 0; background: linear-gradient(270deg, rgba(255,255,255,0.35), transparent); }
+.keyframe-list li { gap: 6px; }
+.keyframe-list .kf-time { min-width: 90px; }
+.add-shape { max-width: 130px; }
+.editor-toolbar { overflow-x: auto; overflow-y: hidden; }
+.editor-toolbar > * { flex-shrink: 0; white-space: nowrap; }

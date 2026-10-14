@@ -7,6 +7,7 @@ mod device_scenario;
 mod phase4_editor;
 mod phase4_system;
 mod phase5_highlight;
+mod phase6_render;
 mod editor_scenario;
 mod export_cmd;
 mod export_scenario;
@@ -106,6 +107,8 @@ enum Command {
     Phase4System,
     /// Phase 5: highlight con trỏ (R13 / E06) trên bản quay tổng hợp
     Phase5Highlight,
+    /// Phase 6 lượt B: compositor v1 (keyframe, chuyển cảnh, khung thiết bị, hình khối, callout, spotlight)
+    Phase6Render,
     /// Phase 4: quay vùng 64×64 + webcam + mic (Tiêu chuẩn, 60 fps); người dùng rút thiết bị giữa chừng (R06, R07)
     DeviceLoss {
         #[arg(long, default_value_t = 25)]
@@ -203,6 +206,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Phase4Editor => phase4_editor::run().await,
         Command::Phase4System => phase4_system::run().await,
         Command::Phase5Highlight => phase5_highlight::run().await,
+        Command::Phase6Render => phase6_render::run().await,
         Command::DeviceLoss { secs, camera, mic, pause_at, keep } => {
             device_scenario::run(secs, &camera, &mic, pause_at, keep).await
         }

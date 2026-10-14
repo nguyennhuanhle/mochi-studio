@@ -31,7 +31,8 @@ export default function Inspector(props: {
     );
   }
   const duration = Math.round((clip.sourceOut - clip.sourceIn) / clip.speed);
-  if (clip.content.type === "text" || clip.content.type === "blur") {
+  const overlay = ["text", "blur", "shape", "callout", "spotlight"].includes(clip.content.type);
+  if (overlay) {
     return (
       <aside className="inspector">
         <div className="pane-head">
@@ -40,7 +41,10 @@ export default function Inspector(props: {
         <span className="muted small">
           {t("editor.clipStart")}: {formatTimecode(clip.start)} · {t("editor.clipDuration")}: {formatTimecode(duration)}
         </span>
-        <OverlayInspector clip={clip} apply={props.apply} />
+        <div className="stack">
+          <OverlayInspector clip={clip} apply={props.apply} />
+          <ClipFxInspector clip={clip} playhead={props.playhead} apply={props.apply} />
+        </div>
       </aside>
     );
   }

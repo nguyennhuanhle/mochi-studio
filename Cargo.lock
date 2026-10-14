@@ -4646,6 +4646,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "tiny-skia",
  "tokio",
  "tracing",
  "wgpu",

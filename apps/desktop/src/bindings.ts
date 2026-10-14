@@ -915,6 +915,18 @@ export type EditOp = { op: "addTrack"; kind: TrackKind } |
  */
 { op: "deleteClips"; clipIds: string[]; ripple: boolean } | { op: "setClipSpeed"; clipId: string; speed: number } | { op: "setClipAudio"; clipId: string; volumeDb: number | null; fadeIn: Ticks | null; fadeOut: Ticks | null; muted: boolean | null } | { op: "setClipTransform"; clipId: string; transform: Transform } | 
 /**
+ * E12 (v1): thay toàn bộ keyframe của clip (rỗng = bỏ keyframe, dùng transform tĩnh).
+ */
+{ op: "setKeyframes"; clipId: string; keyframes: Keyframe[] } | 
+/**
+ * E12 (v1): chuyển cảnh vào (`out = false`) hoặc ra (`out = true`); None = bỏ.
+ */
+{ op: "setTransition"; clipId: string; out: boolean; transition: Transition | null } | 
+/**
+ * E15 (v1): màu, viền, bo góc, bóng, khung thiết bị.
+ */
+{ op: "setLook"; clipId: string; look: Look } | 
+/**
  * E05–E08: thay toàn bộ hiệu ứng của một clip bản quay (K-E2: chỉ clip bản quay).
  */
 { op: "setRecordingFx"; clipId: string; fx: RecordingFx } | 
