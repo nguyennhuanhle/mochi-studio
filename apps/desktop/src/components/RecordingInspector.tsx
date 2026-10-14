@@ -38,12 +38,19 @@ export default function RecordingInspector(props: {
   onSelectZoom: (id: string | null) => void;
   apply: (op: EditOp) => Promise<boolean>;
   onRegenerate: () => void;
+  /** Số bản quay KHÁC trong project (để hiện nút "áp dụng cho mọi bản quay"). */
+  otherRecordings: number;
 }) {
   const { t } = useTranslation();
   const { clip, fx } = props;
   const set = (patch: (f: RecordingFx) => RecordingFx) =>
     props.apply({ op: "setRecordingFx", clipId: clip.id, fx: patch(structuredClone(fx)) });
   const bg = fx.background;
+  // Kiểu nền trước khi tắt "Nền & khung" → bật lại thì trả về kiểu đó.
+  const [lastKind, setLastKind] = useState<"color" | "gradient" | "image">(bg.kind === "none" ? "gradient" : bg.kind);
+  useEffect(() => {
+    if (bg.kind !== "none") setLastKind(bg.kind);
+  }, [bg.kind]);
   const hasCamera = props.media?.recording?.hasCamera ?? false;
   /** Thời điểm trong media ứng với đầu phát (zoom / ẩn webcam lưu theo thời gian trong media). */
   const mediaAtPlayhead = Math.max(
@@ -55,17 +62,25 @@ export default function RecordingInspector(props: {
   return (
     <div className="stack">
       <Section title={t("polish.background")}>
-        <Select
-          label={t("polish.background")}
-          value={bg.kind}
-          options={[
-            { value: "none", label: t("polish.bgNone") },
-            { value: "color", label: t("polish.bgColor") },
-            { value: "gradient", label: t("polish.bgGradient") },
-            { value: "image", label: t("polish.bgImage") },
-          ]}
-          onChange={(kind) => set((f) => ({ ...f, background: { ...f.background, kind } }))}
+        {/* Tắt = trọn khung hình đã quay (không nền, khoảng đệm, bo góc, đổ bóng). Áp cho mọi clip của bản quay này. */}
+        <Check
+          label={t("polish.frameOn")}
+          checked={bg.kind !== "none"}
+          onChange={(on) => set((f) => ({ ...f, background: { ...f.background, kind: on ? lastKind : "none" } }))}
         />
+        {bg.kind === "none" && <p className="muted small">{t("polish.frameOffHint")}</p>}
+        {bg.kind !== "none" && (
+          <Select
+            label={t("polish.bgKind")}
+            value={bg.kind}
+            options={[
+              { value: "color", label: t("polish.bgColor") },
+              { value: "gradient", label: t("polish.bgGradient") },
+              { value: "image", label: t("polish.bgImage") },
+            ]}
+            onChange={(kind) => set((f) => ({ ...f, background: { ...f.background, kind } }))}
+          />
+        )}
         {(bg.kind === "color" || bg.kind === "gradient") && (
           <ColorField label={t("polish.color")} value={bg.color} onCommit={(color) => set((f) => ({ ...f, background: { ...f.background, color } }))} />
         )}
@@ -312,6 +327,11 @@ export default function RecordingInspector(props: {
         <span className="muted small">{t("polish.zoomCount", { n: fx.zoom.segments.length })}</span>
         {zoom && <ZoomEditor clip={clip} zoom={zoom} apply={props.apply} onDeleted={() => props.onSelectZoom(null)} />}
       </Section>
+      {props.otherRecordings > 0 && (
+        <button onClick={() => props.apply({ op: "applyRecordingFxToAll", clipId: clip.id })} title={t("polish.applyAllHint")}>
+          {t("polish.applyAll", { n: props.otherRecordings })}
+        </button>
+      )}
     </div>
   );
 }

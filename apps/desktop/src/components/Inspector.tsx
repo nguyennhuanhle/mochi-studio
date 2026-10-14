@@ -125,6 +125,13 @@ export default function Inspector(props: {
             onSelectZoom={props.onSelectZoom}
             apply={props.apply}
             onRegenerate={() => props.onRegenerateZoom(clip.id)}
+            otherRecordings={
+              new Set(
+                props.view.project.clips
+                  .filter((c) => c.content.type === "recording" && c.mediaId !== clip.mediaId)
+                  .map((c) => c.mediaId),
+              ).size
+            }
           />
         )}
       </div>

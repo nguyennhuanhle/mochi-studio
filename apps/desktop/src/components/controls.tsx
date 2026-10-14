@@ -16,6 +16,17 @@ export function Slider(props: {
   const [v, setV] = useState(props.value);
   useEffect(() => setV(props.value), [props.value]);
   const commit = () => v !== props.value && props.onCommit(v);
+  // Sự kiện "change" gốc của input range = người dùng đã thả / chọn xong giá trị (kể cả bấm lên
+  // thanh, phím, chuột thả ngoài thanh) — chắc chắn hơn pointerup. Ref giữ hàm commit mới nhất.
+  const input = useRef<HTMLInputElement>(null);
+  const latest = useRef(commit);
+  latest.current = commit;
+  useEffect(() => {
+    const el = input.current;
+    const onChange = () => latest.current();
+    el?.addEventListener("change", onChange);
+    return () => el?.removeEventListener("change", onChange);
+  }, []);
   return (
     <label className="field">
       <span className="row space">
@@ -30,6 +41,7 @@ export function Slider(props: {
         </span>
       </span>
       <input
+        ref={input}
         type="range"
         min={props.min}
         max={props.max}
@@ -38,6 +50,7 @@ export function Slider(props: {
         onChange={(e) => setV(Number(e.target.value))}
         onPointerUp={commit}
         onKeyUp={commit}
+        onBlur={commit}
       />
     </label>
   );

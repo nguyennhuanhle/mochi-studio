@@ -63,7 +63,7 @@ fn config(keystrokes: KeystrokeMode, countdown: u32) -> RecordingConfig {
         quality: RecordingQuality::High,
         countdown_secs: countdown,
         keystrokes,
-        output_root: root(), cursor_highlight: Default::default(),
+        output_root: root(), cursor_highlight: Default::default(), frame: true,
     }
 }
 

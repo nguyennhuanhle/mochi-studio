@@ -225,6 +225,7 @@ impl EditorSession {
                 | EditOp::DetachAudio { .. }
                 | EditOp::SetCanvas { .. }
                 | EditOp::SplitClip { .. }
+                | EditOp::ApplyRecordingFxToAll { .. }
         ) {
             self.mark_major();
         }
@@ -508,8 +509,13 @@ fn project_from_recordings(dir: &Path) -> Result<Project, EditorError> {
         if let Some(mochi_project::Clip { id: clip_id, content: mochi_project::ClipContent::Recording { fx }, .. }) = clip {
             let mut fx = fx;
             // R13: highlight con trỏ đã bật ở màn thiết lập quay.
-            if let Some(h) = mochi_project::sidecar::RecordingSidecar::read(&rec).cursor_highlight {
+            let side = mochi_project::sidecar::RecordingSidecar::read(&rec);
+            if let Some(h) = side.cursor_highlight {
                 fx.cursor.highlight = h.clamped();
+            }
+            // R08: tắt nền & khung lúc quay → clip trọn khung hình.
+            if side.no_frame {
+                fx.background.kind = mochi_project::BackgroundKind::None;
             }
             match zooms {
                 Ok(z) => fx.zoom.segments = z,

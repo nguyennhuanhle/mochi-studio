@@ -506,6 +506,7 @@ impl RecorderService {
         if session.config.cursor_highlight.enabled {
             activity.cursor_highlight = Some(session.config.cursor_highlight.clone().clamped());
         }
+        activity.no_frame = !session.config.frame;
         if let Err(e) = activity.write(&recording_dir) {
             warn!("Không ghi được {}: {e}", mochi_project::sidecar::SIDECAR_FILE);
         }

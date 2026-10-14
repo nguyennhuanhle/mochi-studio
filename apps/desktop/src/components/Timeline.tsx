@@ -2,6 +2,7 @@ import { Fragment, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent
 import { useTranslation } from "react-i18next";
 import type { Clip, EditOp, MediaItem, ProjectView, Ticks, Track } from "../bindings";
 import { formatTimecode, secs, ticks } from "../lib/editor";
+import Dialog from "./Dialog";
 
 const TRACK_H = 74;
 /** E05: dải zoom riêng dưới mỗi track có bản quay. */
@@ -241,7 +242,7 @@ export default function Timeline(props: {
           return (
             <Fragment key={track.id}>
             <div className={track.locked ? "tl-row locked" : "tl-row"} style={{ height: TRACK_H }}>
-              <TrackHeader track={track} apply={props.apply} />
+              <TrackHeader track={track} clips={p.clips.filter((c) => c.trackId === track.id).length} apply={props.apply} />
               <div
                 className="tl-lane"
                 style={{ width: contentW }}
@@ -384,8 +385,11 @@ export default function Timeline(props: {
   );
 }
 
-function TrackHeader({ track, apply }: { track: Track; apply: (op: EditOp) => Promise<boolean> }) {
+function TrackHeader({ track, clips, apply }: { track: Track; clips: number; apply: (op: EditOp) => Promise<boolean> }) {
   const { t } = useTranslation();
+  // Xóa track: track còn clip → hỏi trước (xóa luôn các clip, một bước hoàn tác).
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const remove = () => apply({ op: "removeTrack", trackId: track.id });
   const set = (patch: Partial<Pick<Track, "locked" | "muted" | "hidden" | "volumeDb">>) =>
     apply({
       op: "setTrack",
@@ -428,7 +432,37 @@ function TrackHeader({ track, apply }: { track: Track; apply: (op: EditOp) => Pr
             {track.hidden ? "◌" : "◉"}
           </button>
         )}
+        <button
+          className="tb"
+          title={track.locked ? t("editor.removeTrackLocked") : t("editor.removeTrack")}
+          disabled={track.locked}
+          onClick={() => (clips > 0 ? setConfirmRemove(true) : remove())}
+        >
+          ✕
+        </button>
       </span>
+      {confirmRemove && (
+        <Dialog
+          title={t("editor.removeTrackTitle", { name: track.name })}
+          onClose={() => setConfirmRemove(false)}
+          actions={
+            <>
+              <button onClick={() => setConfirmRemove(false)}>{t("common.cancel")}</button>
+              <button
+                className="danger"
+                onClick={() => {
+                  setConfirmRemove(false);
+                  remove();
+                }}
+              >
+                {t("editor.removeTrackConfirm")}
+              </button>
+            </>
+          }
+        >
+          <p>{t("editor.removeTrackBody", { count: clips })}</p>
+        </Dialog>
+      )}
       {track.kind !== "overlay" && (
         <label className="tl-track-vol" title={t("editor.trackVolume", { db: shown.toFixed(0) })}>
           <input

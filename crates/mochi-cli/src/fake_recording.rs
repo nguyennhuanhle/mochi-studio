@@ -97,6 +97,7 @@ pub fn make_sized(project_dir: &Path, arrow_png: &Path, w: u32, h: u32) -> anyho
             ActiveWindow { at: 3.0, app: "msedge.exe".into(), title: "Trang web".into() },
         ],
         cursor_highlight: None,
+        no_frame: false,
     }
     .write(&rec)?;
     Ok(rec)

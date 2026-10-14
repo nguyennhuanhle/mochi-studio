@@ -74,6 +74,13 @@ pub struct RecordingConfig {
     /// của clip khi mở trong editor).
     #[serde(default)]
     pub cursor_highlight: mochi_project::CursorHighlight,
+    /// R08: thêm nền & khung (auto-polish) cho clip mới. Tắt = xuất trọn khung hình đã quay.
+    #[serde(default = "yes")]
+    pub frame: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl RecordingConfig {

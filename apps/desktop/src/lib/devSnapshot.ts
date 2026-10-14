@@ -61,6 +61,24 @@ export async function runDevSnapshot(navigate: (to: string) => void) {
     await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
     return;
   }
+  if (mode === "cdp") {
+    await cdpSnapshot(navigate, outDir, log, sleep);
+    un();
+    await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
+    return;
+  }
+  if (mode === "fix2") {
+    await fix2Snapshot(navigate, outDir, snap, log, sleep);
+    un();
+    await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
+    return;
+  }
+  if (mode === "fix1") {
+    await fix1Snapshot(navigate, outDir, snap, log, sleep);
+    un();
+    await commands.devSnapshotFinish(JSON.stringify({ log }, null, 2));
+    return;
+  }
   if (mode === "phase5") {
     await phase5Snapshot(navigate, outDir, snap, log, sleep);
     un();
@@ -352,6 +370,237 @@ async function exportSnapshot(
   } catch (e) {
     log.push(`error: ${String(e)}`);
   }
+}
+
+/**
+ * Mở `recordings/fix1/Bg.mochi`, chọn clip đầu rồi chờ script ngoài điều khiển qua DevTools
+ * (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port) tới khi nó đặt `window.__cdpDone`.
+ */
+async function cdpSnapshot(navigate: (to: string) => void, outDir: string, log: string[], sleep: (ms: number) => Promise<unknown>) {
+  const root = outDir.replace(/[\\/]ui-snap.*$/, "");
+  const w = window as unknown as { __cdpDone?: boolean; __cdpLog?: string[]; __mochiSelect?: (c: string | null, z: string | null) => void };
+  try {
+    const open = await commands.projectOpen(`${root}/fix1/Bg.mochi`);
+    if (open.status !== "ok") throw new Error(JSON.stringify(open.error));
+    navigate("/editor");
+    await sleep(6000);
+    w.__mochiSelect?.(open.data.project.clips[0].id, null);
+    (window as unknown as { __cdpReady?: boolean }).__cdpReady = true;
+    for (let i = 0; i < 600 && !w.__cdpDone; i++) await sleep(500);
+    const v = await commands.projectView();
+    const c = v?.project.clips[0];
+    log.push(`fx: ${c && c.content.type === "recording" ? JSON.stringify(c.content.fx?.background) : "?"}`);
+    log.push(...(w.__cdpLog ?? []));
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`cdp error: ${String(e)}`);
+  }
+  const s = await commands.settingsGet();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
+}
+
+/**
+ * Lượt sửa sau khi người dùng thử installer: tắt "Nền & khung" lúc quay, clip cắt đôi dùng chung
+ * hiệu ứng, xóa track (kể cả track còn chữ / làm mờ). Quay 64×64 góc màn hình, bỏ sau khi thử.
+ */
+async function fix2Snapshot(
+  navigate: (to: string) => void,
+  outDir: string,
+  snap: (label: string, name: string) => Promise<void>,
+  log: string[],
+  sleep: (ms: number) => Promise<unknown>,
+) {
+  void outDir;
+  void snap;
+  const T = 705_600_000;
+  const original = (await commands.settingsGet()).lastRecording;
+  const kinds = async () =>
+    ((await commands.projectView())?.project.clips ?? [])
+      .filter((c) => c.content.type === "recording")
+      .map((c) => (c.content.type === "recording" ? c.content.fx?.background.kind : "?"));
+  const byText = <E extends Element>(sel: string, rx: RegExp) => [...document.querySelectorAll<E>(sel)].find((e) => rx.test(e.textContent ?? ""));
+  const select = (c: string | null, z: string | null) =>
+    (window as unknown as { __mochiSelect?: (c: string | null, z: string | null) => void }).__mochiSelect?.(c, z);
+  let projectDir: string | null = null;
+  try {
+    // ---- màn thiết lập quay: ô "Nền & khung" ----
+    navigate("/record");
+    for (let i = 0; i < 40 && !byText("label.check", /nền & khung|background & frame/i); i++) await sleep(250);
+    const frameBox = byText<HTMLLabelElement>("label.check", /nền & khung|background & frame/i)?.querySelector("input");
+    log.push(`màn quay có ô nền & khung: ${frameBox ? `có (đang ${frameBox.checked ? "bật" : "tắt"})` : "KHÔNG"}`);
+    if (frameBox?.checked) frameBox.click();
+    await sleep(300);
+    log.push(`sau khi bấm: ${frameBox?.checked ? "bật" : "tắt"}`);
+    navigate("/");
+    await sleep(800);
+    const [display] = await commands.recorderListDisplays();
+    const settings = await commands.settingsGet();
+    const res = await commands.recorderStart({
+      target: { kind: "area", displayId: display.id, x: 0, y: 0, width: 64, height: 64 },
+      mic: null,
+      camera: null,
+      systemAudio: false,
+      fps: 30,
+      quality: "standard",
+      countdownSecs: 0,
+      keystrokes: "off",
+      outputRoot: settings.outputRoot!,
+      cursorHighlight: { enabled: false, color: "#FFD54A", size: 160, opacity: 45 },
+      frame: false,
+    });
+    log.push(`start: ${res.status}`);
+    await sleep(3000);
+    const stop = await commands.recorderStop();
+    if (stop.status === "ok") projectDir = stop.data.projectDir;
+    for (let i = 0; i < 40 && !(await commands.projectView()); i++) await sleep(250);
+    await sleep(2500);
+    log.push(`clip mới (tắt nền & khung lúc quay): kind = ${JSON.stringify(await kinds())}`);
+    log.push(`lastRecording.frame = ${(await commands.settingsGet()).lastRecording?.frame}`);
+
+    // ---- cắt đôi clip rồi bật lại nền & khung trên một nửa ----
+    const v0 = await commands.projectView();
+    const clip0 = v0!.project.clips.find((c) => c.content.type === "recording")!;
+    select(clip0.id, null);
+    await commands.playerSeek(Math.round(1.0 * T));
+    await sleep(800);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", bubbles: true }));
+    await sleep(1200);
+    const halves = (await commands.projectView())!.project.clips.filter((c) => c.content.type === "recording");
+    log.push(`sau khi cắt: ${halves.length} clip bản quay`);
+    select(halves[0].id, null);
+    await sleep(1200);
+    const toggle = byText<HTMLLabelElement>(".inspector label.check, label.check", /nền & khung \(|background & frame \(/i)?.querySelector("input");
+    log.push(`ô nền & khung ở bảng thuộc tính: ${toggle ? `có (đang ${toggle.checked ? "bật" : "tắt"})` : "KHÔNG"}`);
+    toggle?.click();
+    await sleep(1500);
+    log.push(`bật trên nửa đầu → kind cả hai nửa = ${JSON.stringify(await kinds())}`);
+
+    // ---- xóa track ----
+    const tracksNow = async () => (await commands.projectView())!.project.tracks.map((t) => `${t.kind}:${t.name}`);
+    byText<HTMLButtonElement>("button", /^\+ (chữ|text)$/i)?.click();
+    await sleep(800);
+    byText<HTMLButtonElement>("button", /^\+ (làm mờ|blur)$/i)?.click();
+    await sleep(800);
+    byText<HTMLButtonElement>("button", /^\+ (track hình|video track)$/i)?.click();
+    await sleep(800);
+    log.push(`track sau khi thêm chữ, làm mờ, track hình: ${JSON.stringify(await tracksNow())}`);
+    const headerOf = (rx: RegExp) => [...document.querySelectorAll<HTMLElement>(".tl-header")].find((h) => rx.test(h.querySelector(".tl-track-name")?.textContent ?? ""));
+    const xOf = (h?: HTMLElement) => [...(h?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find((b) => b.textContent === "✕");
+    xOf(headerOf(/Video 2/))?.click();
+    await sleep(800);
+    log.push(`✕ trên track hình rỗng: ${document.querySelector(".dialog") ? "HIỆN HỘP THOẠI (sai)" : "xóa ngay"} → ${JSON.stringify(await tracksNow())}`);
+    xOf(headerOf(/Overlay/))?.click();
+    await sleep(800);
+    log.push(`✕ trên track overlay: hộp thoại "${document.querySelector(".dialog")?.textContent ?? "(không có)"}"`);
+    document.querySelector<HTMLButtonElement>(".dialog button.danger")?.click();
+    await sleep(1000);
+    log.push(`sau khi xác nhận: ${JSON.stringify(await tracksNow())}; clip chữ/làm mờ còn: ${(await commands.projectView())!.project.clips.filter((c) => c.content.type === "text" || c.content.type === "blur").length}`);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }));
+    await sleep(1000);
+    log.push(`Ctrl+Z: ${JSON.stringify(await tracksNow())}`);
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`fix2 error: ${String(e)}`);
+  }
+  if (projectDir) log.push(`bỏ bản quay thử: ${(await commands.recorderDiscard(projectDir)).status}`);
+  const s = await commands.settingsGet();
+  const dir = projectDir?.toLowerCase();
+  await commands.settingsSet({ ...s, lastRecording: original, recentProjects: s.recentProjects.filter((p) => !dir || !p.toLowerCase().startsWith(dir)) });
+}
+
+/**
+ * Sửa lỗi người dùng báo (2026-10-14): chỉnh nền / khoảng đệm / bo góc rồi xuất → video vẫn mặc định.
+ * Quay 64×64 → trình biên tập → đổi nền → chờ → xuất vào thư mục snapshot.
+ */
+async function fix1Snapshot(
+  navigate: (to: string) => void,
+  outDir: string,
+  snap: (label: string, name: string) => Promise<void>,
+  log: string[],
+  sleep: (ms: number) => Promise<unknown>,
+) {
+  const T = 705_600_000;
+  const fxOf = async () => {
+    const v = await commands.projectView();
+    const c = v?.project.clips.find((x) => x.content.type === "recording");
+    return { id: c?.id, fx: c && c.content.type === "recording" ? c.content.fx : null };
+  };
+  let projectDir: string | null = null;
+  try {
+    navigate("/");
+    await sleep(1500);
+    const [display] = await commands.recorderListDisplays();
+    const settings = await commands.settingsGet();
+    const res = await commands.recorderStart({
+      target: { kind: "area", displayId: display.id, x: 0, y: 0, width: 64, height: 64 },
+      mic: null,
+      camera: null,
+      systemAudio: false,
+      fps: 30,
+      quality: "standard",
+      countdownSecs: 0,
+      keystrokes: "off",
+      outputRoot: settings.outputRoot!,
+      cursorHighlight: settings.lastRecording?.cursorHighlight ?? { enabled: false, color: "#FFD54A", size: 160, opacity: 45 },
+    });
+    log.push(`start: ${res.status}`);
+    await sleep(3000);
+    const stop = await commands.recorderStop();
+    if (stop.status === "ok") projectDir = stop.data.projectDir;
+    for (let i = 0; i < 40 && !(await commands.projectView()); i++) await sleep(250);
+    log.push(`route: ${location.hash}`);
+    const first = await fxOf();
+    log.push(`fx lúc mở: ${JSON.stringify(first.fx?.background)}`);
+    // Chỉnh qua thanh trượt Khoảng đệm của bảng thuộc tính (đúng đường UI).
+    (window as unknown as { __mochiSelect?: (c: string | null, z: string | null) => void }).__mochiSelect?.(first.id ?? null, null);
+    await sleep(1500);
+    const pad = [...document.querySelectorAll<HTMLLabelElement>("label.field")].find((l) => /khoảng đệm|padding/i.test(l.textContent ?? ""));
+    const input = pad?.querySelector<HTMLInputElement>("input[type=range]");
+    if (input) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "0");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(200);
+      input.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    }
+    log.push(`thanh trượt padding: ${input ? "có" : "KHÔNG THẤY"}`);
+    await sleep(1000);
+    log.push(`fx sau 1 s: ${JSON.stringify((await fxOf()).fx?.background)}`);
+    await sleep(10000);
+    log.push(`fx sau 11 s: ${JSON.stringify((await fxOf()).fx?.background)}`);
+    await snap("main", "fix1-editor");
+    const done = new Promise<string>((resolve) => {
+      const unl = events.exportEvent.listen(({ payload }) => {
+        if (payload.msg.type === "child" && (payload.msg.msg.type === "done" || payload.msg.msg.type === "failed")) {
+          unl.then((f) => f());
+          resolve(JSON.stringify(payload.msg.msg));
+        }
+      });
+    });
+    const ex = await commands.exportStart({
+      format: "mp4",
+      codec: "h264",
+      shortSide: 360,
+      fps: 30,
+      quality: "standard",
+      range: { start: 0, end: Math.round(1.5 * T) },
+      output: `${outDir}/fix1.mp4`,
+      overwrite: true,
+      allowBlackFill: false,
+    });
+    log.push(`export: ${ex.status === "ok" ? ex.data.state : JSON.stringify(ex.error)}`);
+    log.push(`kết quả: ${await Promise.race([done, sleep(120000).then(() => "quá 2 phút")])}`);
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`fix1 error: ${String(e)}`);
+  }
+  if (projectDir) log.push(`bỏ bản quay thử: ${(await commands.recorderDiscard(projectDir)).status}`);
+  const s = await commands.settingsGet();
+  const dir = projectDir?.toLowerCase();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !dir || !p.toLowerCase().startsWith(dir)) });
 }
 
 /**

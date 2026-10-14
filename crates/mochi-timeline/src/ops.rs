@@ -23,6 +23,7 @@ pub enum EditOp {
     AddTrack { kind: TrackKind },
     /// Chỉ xóa được track rỗng.
     #[serde(rename_all = "camelCase")]
+    /// Xóa track cùng mọi clip trên đó (UI hỏi xác nhận khi track còn clip). Track khóa → từ chối.
     RemoveTrack { track_id: String },
     #[serde(rename_all = "camelCase")]
     SetTrack {
@@ -71,6 +72,9 @@ pub enum EditOp {
     /// E05–E08: thay toàn bộ hiệu ứng của một clip bản quay (K-E2: chỉ clip bản quay).
     #[serde(rename_all = "camelCase")]
     SetRecordingFx { clip_id: String, fx: RecordingFx },
+    /// Chép nền, con trỏ, webcam của clip này sang mọi clip bản quay khác (giữ zoom riêng của từng clip).
+    #[serde(rename_all = "camelCase")]
+    ApplyRecordingFxToAll { clip_id: String },
     /// E05: thêm vùng zoom (thời gian TRONG MEDIA của clip).
     #[serde(rename_all = "camelCase")]
     AddZoom { clip_id: String, start: Ticks, end: Ticks, amount: f64 },
@@ -117,12 +121,8 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             p.tracks.push(new_track(*kind, name));
         }
         EditOp::RemoveTrack { track_id } => {
-            track(p, track_id)?;
-            if p.clips.iter().any(|c| &c.track_id == track_id) {
-                return Err(TimelineError::Invalid {
-                    detail: "track còn clip".into(),
-                });
-            }
+            ensure_unlocked(p, track_id)?;
+            p.clips.retain(|c| &c.track_id != track_id);
             p.tracks.retain(|t| &t.id != track_id);
         }
         EditOp::SetTrack {
@@ -236,6 +236,20 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             if let ClipContent::Recording { fx: current } = &mut c.content {
                 *current = fx;
             }
+            sync_recording_siblings(p, clip_id);
+        }
+        EditOp::ApplyRecordingFxToAll { clip_id } => {
+            let ClipContent::Recording { fx: src } = recording_clip_mut(p, clip_id)?.content.clone() else {
+                return Err(TimelineError::EffectNotSupported);
+            };
+            let locked: Vec<String> = p.tracks.iter().filter(|t| t.locked).map(|t| t.id.clone()).collect();
+            for c in p.clips.iter_mut().filter(|c| !locked.contains(&c.track_id)) {
+                if let ClipContent::Recording { fx } = &mut c.content {
+                    fx.background = src.background.clone();
+                    fx.cursor = src.cursor.clone();
+                    fx.camera = src.camera.clone();
+                }
+            }
         }
         EditOp::AddZoom { clip_id, start, end, amount } => {
             ensure_clip_unlocked(p, clip_id)?;
@@ -251,6 +265,7 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
                 });
                 sanitize_zooms(&mut fx.zoom.segments);
             }
+            sync_recording_siblings(p, clip_id);
         }
         EditOp::UpdateZoom { clip_id, zoom_id, start, end, amount, target } => {
             ensure_clip_unlocked(p, clip_id)?;
@@ -277,6 +292,7 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
                 z.auto = false;
                 sanitize_zooms(&mut fx.zoom.segments);
             }
+            sync_recording_siblings(p, clip_id);
         }
         EditOp::RemoveZoom { clip_id, zoom_id } => {
             ensure_clip_unlocked(p, clip_id)?;
@@ -284,6 +300,7 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
             if let ClipContent::Recording { fx } = &mut c.content {
                 fx.zoom.segments.retain(|z| &z.id != zoom_id);
             }
+            sync_recording_siblings(p, clip_id);
         }
         EditOp::SetCanvas { width, height } => {
             // Chẵn để encoder chấp nhận; giới hạn 240p–8K.
@@ -359,6 +376,22 @@ pub(crate) fn apply_in_place(p: &mut Project, op: &EditOp) -> Result<(), Timelin
 }
 
 /// K-E2: hiệu ứng bản quay chỉ áp cho clip bản quay.
+/// Các clip cắt ra từ cùng một bản quay dùng chung hiệu ứng (zoom lưu theo thời gian trong media nên
+/// dùng chung được): sửa một clip → các clip anh em trên track không khóa nhận cùng `fx`. Tránh
+/// trường hợp cắt clip rồi chỉnh nền một nửa, nửa kia vẫn mặc định.
+fn sync_recording_siblings(p: &mut Project, clip_id: &str) {
+    let Some(src) = p.clips.iter().find(|c| c.id == clip_id) else { return };
+    let (Some(media), ClipContent::Recording { fx }) = (src.media_id.clone(), src.content.clone()) else { return };
+    let locked: Vec<String> = p.tracks.iter().filter(|t| t.locked).map(|t| t.id.clone()).collect();
+    for c in p.clips.iter_mut() {
+        if c.id != clip_id && c.media_id.as_deref() == Some(media.as_str()) && !locked.contains(&c.track_id)
+            && let ClipContent::Recording { fx: other } = &mut c.content
+        {
+            *other = fx.clone();
+        }
+    }
+}
+
 fn recording_clip_mut<'a>(p: &'a mut Project, id: &str) -> Result<&'a mut Clip, TimelineError> {
     let c = clip_mut(p, id)?;
     if matches!(c.content, ClipContent::Recording { .. }) {
@@ -654,4 +687,98 @@ fn ensure_clip_unlocked(p: &Project, clip_id: &str) -> Result<(), TimelineError>
 
 fn now() -> String {
     chrono::Local::now().to_rfc3339()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mochi_project::{BackgroundKind, MediaItem};
+
+    fn recording(id: &str) -> MediaItem {
+        MediaItem {
+            id: id.into(),
+            kind: MediaKind::Recording,
+            name: id.into(),
+            abs_path: "x".into(),
+            rel_path: None,
+            hash: id.into(),
+            size_bytes: 1.0,
+            duration: Ticks::from_secs(10.0),
+            video: None,
+            audio: None,
+            recording: None,
+        }
+    }
+
+    /// Bản quay A cắt làm 2 clip + bản quay B, kèm một track overlay có chữ.
+    fn project() -> Project {
+        let mut p = mochi_project::new_project("t");
+        p.media = vec![recording("a"), recording("b")];
+        let v1 = p.tracks[0].id.clone();
+        let mut p = crate::apply(&p, &EditOp::AddClip { media_id: "a".into(), track_id: Some(v1.clone()), start: Ticks::ZERO }).unwrap();
+        p = crate::apply(&p, &EditOp::AddClip { media_id: "b".into(), track_id: Some(v1), start: Ticks::from_secs(10.0) }).unwrap();
+        let a = p.clips[0].id.clone();
+        crate::apply(&p, &EditOp::SplitClip { clip_id: a, at: Ticks::from_secs(4.0) }).unwrap()
+    }
+
+    fn fx_of(p: &Project, media: &str) -> Vec<RecordingFx> {
+        p.clips
+            .iter()
+            .filter(|c| c.media_id.as_deref() == Some(media))
+            .filter_map(|c| match &c.content {
+                ClipContent::Recording { fx } => Some(fx.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn editing_one_half_of_a_split_recording_updates_the_other_half() {
+        let p = project();
+        let first = p.clips.iter().find(|c| c.media_id.as_deref() == Some("a")).unwrap();
+        let ClipContent::Recording { fx } = &first.content else { panic!() };
+        let mut fx = fx.clone();
+        fx.background.padding = 0.0;
+        fx.background.rounding = 0.0;
+        let p = crate::apply(&p, &EditOp::SetRecordingFx { clip_id: first.id.clone(), fx }).unwrap();
+        let a = fx_of(&p, "a");
+        assert_eq!(a.len(), 2);
+        assert!(a.iter().all(|f| f.background.padding == 0.0 && f.background.rounding == 0.0));
+        // Bản quay khác không đổi.
+        assert_eq!(fx_of(&p, "b")[0].background.padding, RecordingFx::default().background.padding);
+    }
+
+    #[test]
+    fn apply_to_all_copies_frame_but_keeps_each_clips_zoom() {
+        let p = project();
+        let b = p.clips.iter().find(|c| c.media_id.as_deref() == Some("b")).unwrap().id.clone();
+        let p = crate::apply(&p, &EditOp::AddZoom { clip_id: b.clone(), start: Ticks::ZERO, end: Ticks::from_secs(1.0), amount: 2.0 }).unwrap();
+        let mut fx = fx_of(&p, "b")[0].clone();
+        fx.background.kind = BackgroundKind::None;
+        let p = crate::apply(&p, &EditOp::SetRecordingFx { clip_id: b.clone(), fx }).unwrap();
+        let p = crate::apply(&p, &EditOp::ApplyRecordingFxToAll { clip_id: b }).unwrap();
+        assert!(fx_of(&p, "a").iter().all(|f| f.background.kind == BackgroundKind::None && f.zoom.segments.is_empty()));
+        assert_eq!(fx_of(&p, "b")[0].zoom.segments.len(), 1);
+    }
+
+    #[test]
+    fn removing_a_track_removes_its_clips_unless_locked() {
+        let p = project();
+        let p = crate::apply(
+            &p,
+            &EditOp::AddOverlay {
+                content: ClipContent::Text { text: "hi".into(), font: "Inter".into(), size_px: 48.0, color: "#FFFFFF".into(), background: None },
+                start: Ticks::ZERO,
+                duration: Ticks::from_secs(2.0),
+                track_id: None,
+            },
+        )
+        .unwrap();
+        let overlay = p.tracks.iter().find(|t| t.kind == TrackKind::Overlay).unwrap().id.clone();
+        let locked = crate::apply(&p, &EditOp::SetTrack { track_id: overlay.clone(), name: None, locked: Some(true), muted: None, hidden: None, volume_db: None }).unwrap();
+        assert!(matches!(crate::apply(&locked, &EditOp::RemoveTrack { track_id: overlay.clone() }), Err(TimelineError::TrackLocked { .. })));
+        let p = crate::apply(&p, &EditOp::RemoveTrack { track_id: overlay.clone() }).unwrap();
+        assert!(p.tracks.iter().all(|t| t.id != overlay));
+        assert!(p.clips.iter().all(|c| c.track_id != overlay));
+    }
 }

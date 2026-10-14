@@ -68,7 +68,10 @@
     "systemAudioDevice": "Thiết bị phát: {{name}}",
     "systemAudioError": "Không đo được âm thanh hệ thống: {{detail}}",
     "changeHotkeys": "Đổi phím tắt…",
-    "hotkeyFix": "Chọn phím khác…"
+    "hotkeyFix": "Chọn phím khác…",
+    "frameTitle": "Tự làm đẹp",
+    "frame": "Thêm nền & khung (nền, khoảng đệm, bo góc, đổ bóng)",
+    "frameHint": "Bỏ chọn để video giữ trọn khung hình đã quay. Bật / tắt lại được trong trình biên tập."
   },
   "bar": {
     "pause": "Tạm dừng",
@@ -207,7 +210,12 @@
     "cameraHiddenRange": "Ẩn webcam từ {{a}} đến {{b}} (trong bản quay)",
     "zoomLane": "Zoom",
     "useProxies": "Proxy",
-    "useProxiesHint": "Xem trước bằng bản nhẹ 720p của video / bản quay lớn hơn 1080p (xuất video luôn dùng file gốc)"
+    "useProxiesHint": "Xem trước bằng bản nhẹ 720p của video / bản quay lớn hơn 1080p (xuất video luôn dùng file gốc)",
+    "removeTrack": "Xóa track",
+    "removeTrackLocked": "Track đang khóa — mở khóa để xóa",
+    "removeTrackTitle": "Xóa track {{name}}?",
+    "removeTrackBody": "Track này đang có {{count}} clip. Xóa track sẽ xóa luôn các clip đó (hoàn tác được bằng Ctrl+Z).",
+    "removeTrackConfirm": "Xóa track và clip"
   },
   "timelineError": {
     "notFound": "Không thấy đối tượng.",
@@ -310,7 +318,12 @@
     "cameraX": "Vị trí ngang",
     "cameraY": "Vị trí dọc",
     "deleteHidden": "Xóa đoạn ẩn này",
-    "pickPoint": "Bấm lên ảnh để chọn điểm zoom"
+    "pickPoint": "Bấm lên ảnh để chọn điểm zoom",
+    "frameOn": "Nền & khung (nền, khoảng đệm, bo góc, đổ bóng)",
+    "frameOffHint": "Đang tắt: video giữ trọn khung hình đã quay.",
+    "bgKind": "Kiểu nền",
+    "applyAll": "Áp dụng nền, con trỏ, webcam cho {{n}} bản quay khác",
+    "applyAllHint": "Chép thiết lập nền & khung, con trỏ và webcam của clip này sang mọi bản quay khác trong project (zoom của từng bản quay giữ nguyên)."
   },
   "export": {
     "title": "Xuất video",

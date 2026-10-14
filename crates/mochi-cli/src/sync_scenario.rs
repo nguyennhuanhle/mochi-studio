@@ -54,7 +54,7 @@ pub async fn run(secs: u64, keep: bool) -> anyhow::Result<()> {
         quality: RecordingQuality::Standard,
         countdown_secs: 0,
         keystrokes: KeystrokeMode::Off,
-        output_root: root.clone(), cursor_highlight: Default::default(),
+        output_root: root.clone(), cursor_highlight: Default::default(), frame: true,
     };
     let service = RecorderService::new();
     println!("== S05: quay {secs} s (vùng 64×64 góc trên-trái, âm thanh hệ thống, không mic) ==");

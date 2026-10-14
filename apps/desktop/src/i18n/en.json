@@ -68,7 +68,10 @@
     "systemAudioDevice": "Playback device: {{name}}",
     "systemAudioError": "Can't measure system audio: {{detail}}",
     "changeHotkeys": "Change shortcuts…",
-    "hotkeyFix": "Pick another key…"
+    "hotkeyFix": "Pick another key…",
+    "frameTitle": "Auto-polish",
+    "frame": "Add background & frame (background, padding, corners, shadow)",
+    "frameHint": "Untick to keep the full recorded frame. You can turn it on or off later in the editor."
   },
   "bar": {
     "pause": "Pause",
@@ -207,7 +210,12 @@
     "cameraHiddenRange": "Webcam hidden from {{a}} to {{b}} (in the recording)",
     "zoomLane": "Zoom",
     "useProxies": "Proxy",
-    "useProxiesHint": "Preview with a light 720p copy of videos / recordings larger than 1080p (export always uses the originals)"
+    "useProxiesHint": "Preview with a light 720p copy of videos / recordings larger than 1080p (export always uses the originals)",
+    "removeTrack": "Delete track",
+    "removeTrackLocked": "Track is locked — unlock it to delete",
+    "removeTrackTitle": "Delete track {{name}}?",
+    "removeTrackBody": "This track has {{count}} clip(s). Deleting the track also deletes them (you can undo with Ctrl+Z).",
+    "removeTrackConfirm": "Delete track and clips"
   },
   "timelineError": {
     "notFound": "Item not found.",
@@ -310,7 +318,12 @@
     "cameraX": "Horizontal position",
     "cameraY": "Vertical position",
     "deleteHidden": "Delete this hidden range",
-    "pickPoint": "Click the image to pick the zoom point"
+    "pickPoint": "Click the image to pick the zoom point",
+    "frameOn": "Background & frame (background, padding, corners, shadow)",
+    "frameOffHint": "Off: the video keeps the full recorded frame.",
+    "bgKind": "Background type",
+    "applyAll": "Apply background, cursor and webcam to {{n}} other recording(s)",
+    "applyAllHint": "Copy this clip's background & frame, cursor and webcam settings to every other recording in the project (each recording keeps its own zooms)."
   },
   "export": {
     "title": "Export video",

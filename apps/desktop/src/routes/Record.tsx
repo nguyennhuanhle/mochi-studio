@@ -47,6 +47,8 @@ export default function Record() {
   const [keystrokes, setKeystrokes] = useState<KeystrokeMode>("off");
   /** R13: highlight con trỏ (chỉ có trong preview / video xuất, không vẽ lên màn hình lúc quay). */
   const [highlight, setHighlight] = useState<CursorHighlight>(DEFAULT_HIGHLIGHT);
+  /** R08: thêm nền & khung cho clip mới (tắt = xuất trọn khung hình đã quay). */
+  const [frame, setFrame] = useState(true);
   const [confirmAllKeys, setConfirmAllKeys] = useState(false);
 
   const [starting, setStarting] = useState(false);
@@ -116,6 +118,7 @@ export default function Record() {
         setCountdown(last.countdownSecs);
         setKeystrokes(last.keystrokes);
         if (last.cursorHighlight) setHighlight(last.cursorHighlight);
+        setFrame(last.frame ?? true);
       } else if (ds[0]) {
         setTarget({ kind: "display", id: ds[0].id });
         setCountdown(s.countdownSecs);
@@ -166,6 +169,7 @@ export default function Record() {
       keystrokes,
       outputRoot: settings.outputRoot,
       cursorHighlight: highlight,
+      frame,
     });
     setStarting(false);
     if (res.status === "error") setError(res.error);
@@ -422,6 +426,13 @@ export default function Record() {
             </select>
           </label>
           <p className="muted small">{t("record.keystrokesHint")}</p>
+
+          <h3>{t("record.frameTitle")}</h3>
+          <label className="check">
+            <input type="checkbox" checked={frame} onChange={(e) => setFrame(e.target.checked)} />
+            <span>{t("record.frame")}</span>
+          </label>
+          <p className="muted small">{t("record.frameHint")}</p>
 
           <h3>{t("highlight.title")}</h3>
           <HighlightControls value={highlight} onChange={setHighlight} />

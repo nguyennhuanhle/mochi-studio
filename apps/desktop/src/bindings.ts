@@ -752,6 +752,7 @@ export type Edge = "start" | "end"
 export type EditOp = { op: "addTrack"; kind: TrackKind } | 
 /**
  * Chỉ xóa được track rỗng.
+ * Xóa track cùng mọi clip trên đó (UI hỏi xác nhận khi track còn clip). Track khóa → từ chối.
  */
 { op: "removeTrack"; trackId: string } | { op: "setTrack"; trackId: string; name: string | null; locked: boolean | null; muted: boolean | null; hidden: boolean | null; volumeDb?: number | null } | 
 /**
@@ -770,6 +771,10 @@ export type EditOp = { op: "addTrack"; kind: TrackKind } |
  * E05–E08: thay toàn bộ hiệu ứng của một clip bản quay (K-E2: chỉ clip bản quay).
  */
 { op: "setRecordingFx"; clipId: string; fx: RecordingFx } | 
+/**
+ * Chép nền, con trỏ, webcam của clip này sang mọi clip bản quay khác (giữ zoom riêng của từng clip).
+ */
+{ op: "applyRecordingFxToAll"; clipId: string } | 
 /**
  * E05: thêm vùng zoom (thời gian TRONG MEDIA của clip).
  */
@@ -1116,7 +1121,11 @@ outputRoot: string;
  * R13: highlight con trỏ cho bản quay này (không vẽ lên màn hình lúc quay; thành mặc định
  * của clip khi mở trong editor).
  */
-cursorHighlight?: CursorHighlight }
+cursorHighlight?: CursorHighlight; 
+/**
+ * R08: thêm nền & khung (auto-polish) cho clip mới. Tắt = xuất trọn khung hình đã quay.
+ */
+frame?: boolean }
 /**
  * Hiệu ứng gắn với clip quay (E05–E09). `mochi-render` dịch sang `cap_project::ProjectConfiguration`
  * để renderer của Cap vẽ. Giá trị mặc định = bộ "auto-polish" (R08).

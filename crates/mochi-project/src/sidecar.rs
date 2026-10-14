@@ -40,6 +40,8 @@ pub struct RecordingSidecar {
     pub active_windows: Vec<ActiveWindow>,
     /// R13: highlight con trỏ đã chọn ở màn thiết lập quay → mặc định cho clip của bản quay này.
     pub cursor_highlight: Option<crate::CursorHighlight>,
+    /// R08: người quay tắt "nền & khung" → clip mới không có nền / khoảng đệm / bo góc / đổ bóng.
+    pub no_frame: bool,
 }
 
 impl RecordingSidecar {
