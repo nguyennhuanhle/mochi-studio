@@ -84,6 +84,39 @@ pub fn generate(recording_dir: &Path) -> Result<Vec<ZoomSegment>, String> {
     Ok(from_events(events, total))
 }
 
+/// E06 (v1): thời điểm các lần nhấn chuột (giây trong media, các segment nối liền) — cho tiếng click.
+pub fn click_times(recording_dir: &Path) -> Vec<f64> {
+    let Ok(meta) = cap_project::RecordingMeta::load_for_project(recording_dir) else { return vec![] };
+    let Some(studio) = meta.studio_meta() else { return vec![] };
+    let segments: Vec<(cap_project::CursorEvents, f64)> = match studio {
+        cap_project::StudioRecordingMeta::SingleSegment { segment } => {
+            let cursor = segment
+                .cursor
+                .as_ref()
+                .and_then(|p| cap_project::CursorEvents::load_from_file(&meta.path(p)).ok())
+                .unwrap_or_default();
+            let len = crate::media::probe(&meta.path(&segment.display.path)).map(|m| m.duration.secs()).unwrap_or(0.0);
+            vec![(cursor, len)]
+        }
+        cap_project::StudioRecordingMeta::MultipleSegments { inner } => inner
+            .segments
+            .iter()
+            .map(|s| {
+                let len = crate::media::probe(&meta.path(&s.display.path)).map(|m| m.duration.secs()).unwrap_or(0.0);
+                (s.cursor_events(&meta), len)
+            })
+            .collect(),
+    };
+    let mut out = Vec::new();
+    let mut offset = 0.0;
+    for (cursor, len) in segments {
+        out.extend(cursor.clicks.iter().filter(|c| c.down).map(|c| offset + c.time_ms / 1000.0));
+        offset += len;
+    }
+    out.sort_by(|a, b| a.total_cmp(b));
+    out
+}
+
 fn from_events(mut events: Vec<Event>, total: f64) -> Vec<ZoomSegment> {
     events.sort_by(|a, b| a.t.total_cmp(&b.t));
     // Gom cụm.

@@ -62,6 +62,20 @@ if (-not $SkipDxc) {
   } else { Write-Host '  (đã có) DXC' }
 } else { Write-Host '[2/4] DXC: bỏ qua (-SkipDxc)' }
 
+# ---------- ONNX Runtime (CPU) cho xóa / làm mờ nền webcam (E08) ----------
+# Bản CPU (MIT, không kèm DirectML.dll): model tách người 256x256 chạy CPU vài ms / khung.
+$OrtDir = Join-Path $NativeDeps 'ort'
+Write-Host '[2b/4] ONNX Runtime 1.24.4 (CPU)'
+if (-not (Test-Path (Join-Path $OrtDir 'onnxruntime.dll'))) {
+  New-Item -ItemType Directory -Force $OrtDir | Out-Null
+  $OrtPkg = Join-Path $Target 'ort-cpu.1.24.4.zip'
+  Get-Download 'https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.24.4/microsoft.ml.onnxruntime.1.24.4.nupkg' $OrtPkg
+  $OrtExtract = Join-Path $Target 'ort-cpu-pkg'
+  Expand-Archive -Path $OrtPkg -DestinationPath $OrtExtract -Force
+  Copy-Item -Force (Join-Path $OrtExtract 'runtimes\win-x64\native\onnxruntime.dll') $OrtDir
+  Copy-Item -Force (Join-Path $OrtExtract 'LICENSE') (Join-Path $OrtDir 'ONNXRUNTIME-LICENSE.txt') -ErrorAction SilentlyContinue
+} else { Write-Host '  (đã có) ONNX Runtime' }
+
 # ---------- libclang ----------
 Write-Host '[3/4] libclang'
 $ClangCandidates = @(
@@ -99,6 +113,7 @@ foreach ($profile in 'debug', 'release') {
   New-Item -ItemType Directory -Force $dst | Out-Null
   Copy-Item -Force (Join-Path $NativeDeps 'bin\*.dll') $dst
   if (Test-Path $DxcDir) { Copy-Item -Force (Join-Path $DxcDir '*.dll') $dst }
+  if (Test-Path $OrtDir) { Copy-Item -Force (Join-Path $OrtDir '*.dll') $dst }
 }
 
 Write-Host "`nXong. Thử: cargo run -p mochi-cli -- targets"

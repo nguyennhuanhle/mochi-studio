@@ -596,6 +596,16 @@ impl Capturer {
                         let texture = unsafe { dxgi_interface.GetInterface::<ID3D11Texture2D>() }?;
 
                         let frame = if let Some((cropped_texture, crop)) = crop_data.clone() {
+                            // [MOCHI] R01 v1: dời khung cắt theo cửa sổ (giữ nguyên kích thước, kẹp trong màn hình).
+                            let crop = {
+                                let (dx, dy) = scap_targets::mochi_follow::get();
+                                let (w, h) = (crop.right - crop.left, crop.bottom - crop.top);
+                                let max_x = (size.Width as i64 - w as i64).max(0);
+                                let max_y = (size.Height as i64 - h as i64).max(0);
+                                let left = (crop.left as i64 + dx as i64).clamp(0, max_x) as u32;
+                                let top = (crop.top as i64 + dy as i64).clamp(0, max_y) as u32;
+                                D3D11_BOX { left, top, right: left + w, bottom: top + h, ..crop }
+                            };
                             unsafe {
                                 d3d_context.CopySubresourceRegion(
                                     &cropped_texture,

@@ -587,5 +587,46 @@
     "add": "+ Spotlight",
     "ellipse": "Elliptical highlight",
     "dim": "Dim outside"
+  },
+  "cursor": {
+    "style": "Cursor style",
+    "style_recorded": "As recorded",
+    "style_macOs": "macOS style",
+    "style_windows": "Windows style",
+    "motionBlur": "Motion blur",
+    "spotlight": "Cursor spotlight",
+    "spotlightSize": "Spotlight size",
+    "spotlightDim": "Dim outside",
+    "magnifier": "Cursor magnifier",
+    "magnifierZoom": "Magnification",
+    "magnifierSize": "Lens size",
+    "clickSound": "Click sound",
+    "clickVolume": "Click volume"
+  },
+  "cam": {
+    "layout": "Layout",
+    "layout_pip": "Webcam in a corner",
+    "layout_cameraOnly": "Webcam only",
+    "layout_split": "Split screen",
+    "layout_floating": "Floating cards",
+    "background": "Background behind you",
+    "bg_keep": "Keep",
+    "bg_blur": "Light blur",
+    "bg_strongBlur": "Strong blur",
+    "bg_remove": "Remove (AI)",
+    "chroma": "Chroma key (green screen)",
+    "chromaColor": "Key color",
+    "chromaTolerance": "Tolerance"
+  },
+  "keys": {
+    "title": "Keystrokes",
+    "enabled": "Show keyboard shortcuts in the video",
+    "position": "Position",
+    "pos_bottomCenter": "Bottom center",
+    "pos_bottomLeft": "Bottom left",
+    "pos_bottomRight": "Bottom right",
+    "pos_topCenter": "Top center",
+    "size": "Font size",
+    "hint": "Uses the keystrokes captured while recording (turn on \"Record keystrokes\" in the recording setup)."
   }
 }

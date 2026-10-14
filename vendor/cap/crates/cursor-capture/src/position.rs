@@ -159,6 +159,11 @@ impl CursorCropBounds {
         }
     }
 
+    /// [MOCHI] R01 v1: khung cắt dời theo cửa sổ đang được bám theo (pixel vật lý).
+    pub fn mochi_shifted(&self, dx: f64, dy: f64) -> Self {
+        Self { x: self.x + dx, y: self.y + dy, ..*self }
+    }
+
     #[cfg(target_os = "windows")]
     pub fn new_windows(bounds: PhysicalBounds) -> Self {
         Self {

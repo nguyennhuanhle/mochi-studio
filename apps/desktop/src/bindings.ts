@@ -695,6 +695,7 @@ export type CacheInfo = { usage: CacheUsage; limitGb: number }
  */
 export type CacheTrimmed = { files: number; bytes: number }
 export type CacheUsage = { totalBytes: number; proxiesBytes: number; thumbsBytes: number; waveformsBytes: number; projects: number }
+export type CameraBackground = "keep" | "blur" | "strongBlur" | "remove"
 /**
  * E08: webcam dạng picture-in-picture.
  */
@@ -722,8 +723,21 @@ borderColor: string;
 /**
  * Độ dày viền, phần trăm cạnh ngắn của webcam: 0,5–10.
  */
-borderWidth: number }
+borderWidth: number; 
+/**
+ * E08 (v1): bố cục — webcam góc (PiP), chỉ webcam, chia đôi, hai thẻ nổi.
+ */
+layout: CameraLayout; 
+/**
+ * E08 (v1): nền phía sau người trong webcam (AI chạy trên máy).
+ */
+background: CameraBackground; 
+/**
+ * E08 (v1): chroma key (phông xanh).
+ */
+chroma: ChromaKey }
 export type CameraInfo = { id: string; name: string }
+export type CameraLayout = "pip" | "cameraOnly" | "split" | "floating"
 export type CameraShape = "rounded" | "circle" | 
 /**
  * Giữ tỉ lệ gốc của webcam.
@@ -768,7 +782,17 @@ export type ChildMsg = { type: "started"; encoder: string; hardware: boolean; wi
  * Encoder phần cứng lỗi giữa chừng → chuyển sang phần mềm và render lại từ đầu.
  */
 { type: "fallback"; from: string; to: string } | { type: "done"; path: string; bytes: number; secs: number; encoder: string } | { type: "failed"; error: ExportError }
+export type ChromaKey = { enabled: boolean; color: string; 
+/**
+ * Ngưỡng 1–100.
+ */
+tolerance: number }
 export type ClickEffect = "none" | "ripple"
+export type ClickSound = { enabled: boolean; 
+/**
+ * 0–100 %.
+ */
+volume: number }
 export type Clip = { id: string; trackId: string; mediaId: string | null; 
 /**
  * Vị trí trên timeline.
@@ -852,7 +876,27 @@ smooth: boolean; clickEffect: ClickEffect;
 /**
  * R13 / E06 (v1.3): vòng sáng quanh con trỏ.
  */
-highlight: CursorHighlight }
+highlight: CursorHighlight; 
+/**
+ * E06 (v1): kiểu con trỏ — đúng như đã ghi, hoặc thay bằng bộ con trỏ macOS / Windows.
+ */
+style: CursorStyle; 
+/**
+ * E06 (v1): nhòe con trỏ khi di chuyển nhanh, 0–1 (0 = tắt).
+ */
+motionBlur: number; 
+/**
+ * E06 (v1): làm tối mọi thứ ngoài vùng quanh con trỏ.
+ */
+spotlight: CursorSpotlight; 
+/**
+ * E06 (v1): kính lúp quanh con trỏ.
+ */
+magnifier: CursorMagnifier; 
+/**
+ * E06 (v1): tiếng "tách" mỗi lần click.
+ */
+clickSound: ClickSound }
 /**
  * R13 / E06: highlight con trỏ kiểu Camtasia — chỉ là hiệu ứng khi render (không dính vào bản quay).
  */
@@ -869,6 +913,25 @@ size: number;
  * Độ đậm ở tâm, %: 10–100.
  */
 opacity: number }
+export type CursorMagnifier = { enabled: boolean; 
+/**
+ * Độ phóng 1,5–4×.
+ */
+zoom: number; 
+/**
+ * Bán kính kính lúp, % cạnh ngắn của khung: 8–40.
+ */
+size: number }
+export type CursorSpotlight = { enabled: boolean; 
+/**
+ * Bán kính vùng sáng, % cạnh ngắn của khung: 5–60.
+ */
+size: number; 
+/**
+ * Độ tối phần ngoài 0–1.
+ */
+dim: number }
+export type CursorStyle = "recorded" | "macOs" | "windows"
 export type DeviceFrame = "none" | "laptop" | "phone" | "browser"
 export type DeviceKind = "microphone" | "camera" | "systemAudio" | "screen"
 export type DeviceList = { 
@@ -1122,6 +1185,15 @@ export type Keyframe = { at: Ticks; x: number; y: number; scale: number;
  */
 rotation: number; opacity: number; easing: Easing }
 /**
+ * R09 / E10 (v1): overlay phím bấm (từ dữ liệu ghi phím của bản quay).
+ */
+export type KeysFx = { enabled: boolean; position: KeysPosition; 
+/**
+ * Cỡ chữ (pixel ở 1080p): 20–120.
+ */
+size: number }
+export type KeysPosition = "bottomCenter" | "bottomLeft" | "bottomRight" | "topCenter"
+/**
  * K-R3: mặc định không ghi phím. `ModifiersOnly` chỉ giữ tổ hợp có Ctrl/Alt/Win;
  * `All` ghi mọi phím và chỉ bật được sau hộp thoại cảnh báo ở UI.
  */
@@ -1350,7 +1422,11 @@ frame?: boolean }
  * Hiệu ứng gắn với clip quay (E05–E09). `mochi-render` dịch sang `cap_project::ProjectConfiguration`
  * để renderer của Cap vẽ. Giá trị mặc định = bộ "auto-polish" (R08).
  */
-export type RecordingFx = { background: BackgroundFx; cursor: CursorFx; camera: CameraFx; zoom: ZoomFx }
+export type RecordingFx = { background: BackgroundFx; cursor: CursorFx; camera: CameraFx; zoom: ZoomFx; 
+/**
+ * R09 / E10 (v1): hiện phím tắt đã ghi lên video.
+ */
+keys: KeysFx }
 /**
  * Bản quay của Mochi (layout Cap) trong `recordings/<id>/`.
  */

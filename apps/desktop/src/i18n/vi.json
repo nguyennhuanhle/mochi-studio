@@ -587,5 +587,46 @@
     "add": "+ Spotlight",
     "ellipse": "Vùng sáng hình elip",
     "dim": "Độ tối bên ngoài"
+  },
+  "cursor": {
+    "style": "Kiểu con trỏ",
+    "style_recorded": "Như lúc quay",
+    "style_macOs": "Kiểu macOS",
+    "style_windows": "Kiểu Windows",
+    "motionBlur": "Nhòe khi di chuyển",
+    "spotlight": "Spotlight quanh con trỏ",
+    "spotlightSize": "Cỡ vùng sáng",
+    "spotlightDim": "Độ tối bên ngoài",
+    "magnifier": "Kính lúp quanh con trỏ",
+    "magnifierZoom": "Độ phóng",
+    "magnifierSize": "Cỡ kính lúp",
+    "clickSound": "Tiếng click",
+    "clickVolume": "Âm lượng tiếng click"
+  },
+  "cam": {
+    "layout": "Bố cục",
+    "layout_pip": "Webcam ở góc",
+    "layout_cameraOnly": "Chỉ webcam",
+    "layout_split": "Chia đôi màn hình",
+    "layout_floating": "Hai thẻ nổi",
+    "background": "Nền sau người",
+    "bg_keep": "Giữ nguyên",
+    "bg_blur": "Làm mờ nhẹ",
+    "bg_strongBlur": "Làm mờ mạnh",
+    "bg_remove": "Xóa nền (AI)",
+    "chroma": "Chroma key (phông xanh)",
+    "chromaColor": "Màu phông",
+    "chromaTolerance": "Ngưỡng"
+  },
+  "keys": {
+    "title": "Hiện phím bấm",
+    "enabled": "Hiện phím tắt trong video",
+    "position": "Vị trí",
+    "pos_bottomCenter": "Dưới giữa",
+    "pos_bottomLeft": "Dưới trái",
+    "pos_bottomRight": "Dưới phải",
+    "pos_topCenter": "Trên giữa",
+    "size": "Cỡ chữ",
+    "hint": "Lấy từ dữ liệu ghi phím lúc quay (bật \"Ghi phím bấm\" ở màn thiết lập quay)."
   }
 }

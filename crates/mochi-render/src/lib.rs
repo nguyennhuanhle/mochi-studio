@@ -525,6 +525,7 @@ impl Renderer {
                     stats.missing_frames += 1;
                     return;
                 };
+                let cursor = self.sources.get(&item.id).and_then(|s| s.cursor());
                 let fit = (fw / frame.width as f32).min(fh / frame.height as f32);
                 let s = fit * tf.scale as f32 * m.scale;
                 let mut half = [frame.width as f32 * s / 2.0, frame.height as f32 * s / 2.0];
@@ -560,11 +561,52 @@ impl Renderer {
                 q.contrast = look.contrast as f32 / 100.0;
                 q.saturation = look.saturation as f32 / 100.0;
                 apply_motion(&mut q, m, opacity);
-                out.push(Layer::Quad { frame: Some(frame), q });
+                out.push(Layer::Quad { frame: Some(frame.clone()), q });
                 for mut q in device.over {
                     q.rotation = rotation;
                     apply_motion(&mut q, m, opacity);
                     out.push(Layer::Quad { frame: None, q });
+                }
+                // E06 (v1): spotlight / kính lúp quanh con trỏ (bản quay).
+                if let (ClipContent::Recording { fx }, Some((pos, cursor_opacity))) = (&clip.content, cursor)
+                    && cursor_opacity > 0.01
+                    && (fx.cursor.spotlight.enabled || fx.cursor.magnifier.enabled)
+                {
+                    // Pixel trong khung bản quay → pixel trên canvas (theo tâm / nửa kích thước / xoay của clip).
+                    let (u, v) = (pos[0] as f32 / frame.width as f32, pos[1] as f32 / frame.height as f32);
+                    let (lx, ly) = ((u - 0.5) * 2.0 * half[0], (v - 0.5) * 2.0 * half[1]);
+                    let (cs, sn) = (rotation.cos(), rotation.sin());
+                    let p = [center[0] + lx * cs - ly * sn, center[1] + lx * sn + ly * cs];
+                    let short = fw.min(fh);
+                    if fx.cursor.spotlight.enabled {
+                        let r = fx.cursor.spotlight.size as f32 / 100.0 * short;
+                        let mut q = Quad::new(Mode::Spotlight, [fw / 2.0, fh / 2.0], [fw / 2.0, fh / 2.0]);
+                        q.spot = [p[0] - r, p[1] - r, p[0] + r, p[1] + r];
+                        q.border = 1.0;
+                        q.radius = r * 0.35;
+                        q.fill = [0.0, 0.0, 0.0, fx.cursor.spotlight.dim as f32 * cursor_opacity];
+                        q.opacity = opacity;
+                        out.push(Layer::Quad { frame: None, q });
+                    }
+                    if fx.cursor.magnifier.enabled {
+                        let r = fx.cursor.magnifier.size as f32 / 100.0 * short;
+                        let zoom = fx.cursor.magnifier.zoom as f32;
+                        let (ex, ey) = (r / zoom / (2.0 * half[0]), r / zoom / (2.0 * half[1]));
+                        let mut shadow = Quad::new(Mode::Shadow, p, [r, r]);
+                        shadow.radius = r;
+                        shadow.extent = r * 0.25;
+                        shadow.fill = [0.0, 0.0, 0.0, 0.45 * cursor_opacity];
+                        shadow.opacity = opacity;
+                        out.push(Layer::Quad { frame: None, q: shadow });
+                        let mut q = Quad::new(Mode::Image, p, [r, r]);
+                        q.uv_max = frame.uv_max;
+                        q.spot = [u - ex, v - ey, u + ex, v + ey];
+                        q.radius = r;
+                        q.border = (3.0 * scale).max(2.0);
+                        q.border_color = [1.0, 1.0, 1.0, 0.95];
+                        q.opacity = opacity * cursor_opacity;
+                        out.push(Layer::Quad { frame: Some(frame.clone()), q });
+                    }
                 }
             }
         }

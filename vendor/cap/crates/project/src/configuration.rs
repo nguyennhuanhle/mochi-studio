@@ -444,7 +444,8 @@ pub struct BackgroundBlurConfig {
 
 impl BackgroundBlurConfig {
     pub fn removes_background(&self) -> bool {
-        cfg!(target_os = "macos") && self.mode == BackgroundBlurMode::Remove
+        // [MOCHI] upstream chỉ macOS; Mochi bật cả Windows.
+        self.mode == BackgroundBlurMode::Remove
     }
 
     pub fn is_active(&self) -> bool {
@@ -565,6 +566,26 @@ pub struct Camera {
     /// [MOCHI] Viền quanh webcam. `width` = phần trăm cạnh ngắn của webcam.
     #[serde(default)]
     pub border: Option<BorderConfiguration>,
+    /// [MOCHI] Chroma key (phông xanh): màu khóa + ngưỡng 0–1.
+    #[serde(default)]
+    pub chroma_key: Option<ChromaKeyConfig>,
+}
+
+/// [MOCHI] Chroma key cho webcam.
+#[derive(Type, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChromaKeyConfig {
+    pub color: [u16; 3],
+    /// 0–1: khoảng cách màu (trong không gian Cb/Cr) bị coi là phông.
+    pub tolerance: f32,
+}
+
+impl ChromaKeyConfig {
+    /// [MOCHI] Đóng gói cho 3 float đệm của uniform composite: (màu RGB 24 bit, ngưỡng, độ mềm).
+    pub fn uniform(&self) -> [f32; 3] {
+        let packed = ((self.color[0].min(255) as u32) << 16) | ((self.color[1].min(255) as u32) << 8) | self.color[2].min(255) as u32;
+        [packed as f32 + 1.0, self.tolerance.clamp(0.01, 1.0), 0.08]
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, Default)]
@@ -610,6 +631,7 @@ impl Default for Camera {
             scale_during_zoom: Self::default_scale_during_zoom(),
             background_blur: BackgroundBlurConfig::default(),
             border: None,
+            chroma_key: None, // [MOCHI]
         }
     }
 }
@@ -3090,10 +3112,8 @@ mod tests {
         assert!(matches!(round_trip.shape, CameraShape::Square));
         let legacy: Camera = serde_json::from_str("{}").unwrap();
         assert_eq!(legacy.background_blur.mode, BackgroundBlurMode::Off);
-        assert_eq!(
-            round_trip.background_blur.is_active(),
-            cfg!(target_os = "macos")
-        );
+        // [MOCHI] xóa nền bật cả trên Windows.
+        assert!(round_trip.background_blur.is_active());
     }
 
     fn timeline_with_transitions(transitions: Vec<ClipTransition>) -> TimelineConfiguration {

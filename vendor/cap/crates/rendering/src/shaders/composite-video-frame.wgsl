@@ -329,7 +329,7 @@ fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
 
     let sample_target_uv = clamp(target_uv, vec2<f32>(0.0), vec2<f32>(1.0));
     var base_color = sample_texture(sample_target_uv, crop_bounds_uv);
-    base_color.a = base_color.a * shape_coverage * uniforms.opacity;
+    base_color.a = base_color.a * shape_coverage * uniforms.opacity * chroma_alpha(base_color.rgb);
 
     let zoom_amount = uniforms.motion_blur_params.z;
 
@@ -417,6 +417,24 @@ fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
         apply_color_grade(vec4(accum / alpha_sum, out_alpha), target_uv, p),
         shadow_color
     );
+}
+
+// [MOCHI] Chroma key: _padding1a = màu khóa (RGB 24 bit + 1, 0 = tắt), _padding1b = ngưỡng, _padding1c = độ mềm.
+// So khoảng cách trên mặt phẳng Cb/Cr (bỏ độ sáng) → bóng đổ trên phông xanh vẫn bị khóa.
+fn chroma_alpha(rgb: vec3<f32>) -> f32 {
+    if (uniforms._padding1a < 0.5) {
+        return 1.0;
+    }
+    let packed = u32(uniforms._padding1a - 1.0 + 0.5);
+    let key = vec3<f32>(f32((packed >> 16u) & 255u), f32((packed >> 8u) & 255u), f32(packed & 255u)) / 255.0;
+    let to_cbcr = mat3x2<f32>(
+        vec2<f32>(-0.1687, 0.5),
+        vec2<f32>(-0.3313, -0.4187),
+        vec2<f32>(0.5, -0.0813)
+    );
+    let d = distance(to_cbcr * rgb, to_cbcr * key);
+    let tol = uniforms._padding1b * 0.5;
+    return smoothstep(tol, tol + uniforms._padding1c, d);
 }
 
 fn sample_texture(uv: vec2<f32>, crop_bounds_uv: vec4<f32>) -> vec4<f32> {

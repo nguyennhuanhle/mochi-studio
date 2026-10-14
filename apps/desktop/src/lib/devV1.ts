@@ -27,6 +27,7 @@ export async function runV1(mode: string, c: Ctx) {
   if (mode === "v1a") await roundA(c);
   if (mode === "v1r") await presetDebug(c);
   if (mode === "v1b") await roundB(c);
+  if (mode === "v1c") await roundC(c);
 }
 
 /** Kéo một thanh trượt (theo nhãn) tới giá trị `v` rồi "thả" (sự kiện change). */
@@ -132,6 +133,48 @@ async function roundB({ navigate, outDir, snap, log, sleep }: Ctx) {
     navigate("/");
   } catch (e) {
     log.push(`v1b error: ${String(e)}`);
+  }
+  const s = await commands.settingsGet();
+  await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });
+}
+
+async function roundC({ navigate, outDir, snap, log, sleep }: Ctx) {
+  const root = outDir.replace(/[\\/]ui-snap.*$/, "");
+  try {
+    const open = await commands.projectOpen(`${root}/phase6/recording/Rec.mochi`);
+    if (open.status !== "ok") throw new Error(JSON.stringify(open.error));
+    navigate("/editor");
+    await sleep(7000);
+    const view = async () => (await commands.projectView())!;
+    const clip = (await view()).project.clips[0];
+    select(clip.id);
+    await commands.playerSeek(Math.round(2.15 * T));
+    await sleep(1500);
+    const check = (rx: RegExp) => byText<HTMLLabelElement>("label.check", rx)?.querySelector("input");
+    check(/spotlight quanh con trỏ|cursor spotlight/i)?.click();
+    await sleep(900);
+    check(/kính lúp|cursor magnifier/i)?.click();
+    await sleep(900);
+    check(/hiện phím tắt trong video|show keyboard shortcuts/i)?.click();
+    await sleep(900);
+    choose(/^bố cục$|^layout$/i, "floating");
+    await sleep(900);
+    choose(/kiểu con trỏ|cursor style/i, "macOs");
+    await sleep(900);
+    check(/tiếng click|click sound/i)?.click();
+    await sleep(900);
+    const fx = (await view()).project.clips[0].content;
+    if (fx.type === "recording" && fx.fx) {
+      const c = fx.fx;
+      log.push(`E06: spotlight ${c.cursor.spotlight?.enabled}, kính lúp ${c.cursor.magnifier?.enabled}, kiểu ${c.cursor.style}, tiếng click ${c.cursor.clickSound?.enabled}`);
+      log.push(`E08: bố cục ${c.camera.layout}; R09 phím: ${c.keys?.enabled}`);
+    }
+    await sleep(2000);
+    await snap("main", "v1c-1-cursor-keys-floating");
+    await commands.projectClose(true);
+    navigate("/");
+  } catch (e) {
+    log.push(`v1c error: ${String(e)}`);
   }
   const s = await commands.settingsGet();
   await commands.settingsSet({ ...s, recentProjects: s.recentProjects.filter((p) => !/[\\/]recordings[\\/]/i.test(p)) });

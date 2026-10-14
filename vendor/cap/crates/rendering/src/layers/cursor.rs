@@ -57,6 +57,8 @@ pub struct CursorLayer {
     statics: Statics,
     /// [MOCHI] highlight con trỏ, vẽ dưới sprite.
     highlight: super::click_ripple::CursorHighlight,
+    /// [MOCHI] vị trí con trỏ trên khung đầu ra (pixel, sau zoom) + độ hiện của frame vừa chuẩn bị.
+    mochi_last: Option<([f64; 2], f32)>,
     bind_group: Option<BindGroup>,
     cursors: HashMap<String, CursorTexture>,
     circle_cursor: Option<CursorTexture>,
@@ -217,6 +219,7 @@ impl CursorLayer {
 
         Self {
             highlight: super::click_ripple::CursorHighlight::new(device),
+            mochi_last: None,
             statics,
             bind_group: None,
             cursors: Default::default(),
@@ -449,6 +452,7 @@ impl CursorLayer {
     ) {
         let clip_visibility = uniforms.cursor_clip_visibility.clamp(0.0, 1.0);
         self.highlight.clear(); // [MOCHI] mọi nhánh return sớm = không vẽ highlight
+        self.mochi_last = None; // [MOCHI]
         if uniforms.project.cursor.hide || clip_visibility <= f32::EPSILON {
             self.bind_group = None;
             return;
@@ -525,6 +529,9 @@ impl CursorLayer {
         // [MOCHI] highlight đi theo vị trí + độ hiện của con trỏ (ẩn khi con trỏ tự ẩn).
         self.highlight
             .prepare(uniforms, constants, interpolated_cursor.position.coord, cursor_opacity);
+        // [MOCHI] vị trí trên khung đầu ra cho spotlight / kính lúp của Mochi.
+        let target = uniforms.display.source_uv_to_target(interpolated_cursor.position.coord);
+        self.mochi_last = Some(([target.x, target.y], cursor_opacity));
 
         let cursor_type = uniforms.project.cursor.cursor_type().clone();
 
@@ -667,6 +674,13 @@ impl CursorLayer {
             pass.set_bind_group(0, bind_group, &[]);
             pass.draw(0..4, 0..1);
         }
+    }
+}
+
+impl CursorLayer {
+    /// [MOCHI] Vị trí con trỏ (pixel khung đầu ra) + độ hiện của frame vừa chuẩn bị; None = không vẽ con trỏ.
+    pub fn mochi_cursor(&self) -> Option<([f64; 2], f32)> {
+        self.mochi_last
     }
 }
 

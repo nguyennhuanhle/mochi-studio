@@ -576,6 +576,34 @@ pub struct RecordingFx {
     pub cursor: CursorFx,
     pub camera: CameraFx,
     pub zoom: ZoomFx,
+    /// R09 / E10 (v1): hiện phím tắt đã ghi lên video.
+    pub keys: KeysFx,
+}
+
+/// R09 / E10 (v1): overlay phím bấm (từ dữ liệu ghi phím của bản quay).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct KeysFx {
+    pub enabled: bool,
+    pub position: KeysPosition,
+    /// Cỡ chữ (pixel ở 1080p): 20–120.
+    pub size: f64,
+}
+
+impl Default for KeysFx {
+    fn default() -> Self {
+        Self { enabled: false, position: KeysPosition::BottomCenter, size: 50.0 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum KeysPosition {
+    #[default]
+    BottomCenter,
+    BottomLeft,
+    BottomRight,
+    TopCenter,
 }
 
 impl RecordingFx {
@@ -598,6 +626,17 @@ impl RecordingFx {
         hex(&mut b.color2, &d.background.color2);
         self.cursor.size = clampf(self.cursor.size, 50.0, 300.0);
         self.cursor.highlight = std::mem::take(&mut self.cursor.highlight).clamped();
+        self.cursor.motion_blur = clampf(self.cursor.motion_blur, 0.0, 1.0);
+        let s = &mut self.cursor.spotlight;
+        s.size = clampf(s.size, 5.0, 60.0);
+        s.dim = clampf(s.dim, 0.0, 1.0);
+        let m = &mut self.cursor.magnifier;
+        m.zoom = clampf(m.zoom, 1.5, 4.0);
+        m.size = clampf(m.size, 8.0, 40.0);
+        self.cursor.click_sound.volume = clampf(self.cursor.click_sound.volume, 0.0, 100.0);
+        self.keys.size = clampf(self.keys.size, 20.0, 120.0);
+        self.camera.chroma.tolerance = clampf(self.camera.chroma.tolerance, 1.0, 100.0);
+        hex(&mut self.camera.chroma.color, "#00B140");
         let c = &mut self.camera;
         c.size = clampf(c.size, 10.0, 50.0);
         c.border_width = clampf(c.border_width, 0.5, 10.0);
@@ -630,6 +669,7 @@ impl Default for RecordingFx {
             cursor: CursorFx::default(),
             camera: CameraFx::default(),
             zoom: ZoomFx::default(),
+            keys: KeysFx::default(),
         }
     }
 }
@@ -701,6 +741,71 @@ pub struct CursorFx {
     pub click_effect: ClickEffect,
     /// R13 / E06 (v1.3): vòng sáng quanh con trỏ.
     pub highlight: CursorHighlight,
+    /// E06 (v1): kiểu con trỏ — đúng như đã ghi, hoặc thay bằng bộ con trỏ macOS / Windows.
+    pub style: CursorStyle,
+    /// E06 (v1): nhòe con trỏ khi di chuyển nhanh, 0–1 (0 = tắt).
+    pub motion_blur: f64,
+    /// E06 (v1): làm tối mọi thứ ngoài vùng quanh con trỏ.
+    pub spotlight: CursorSpotlight,
+    /// E06 (v1): kính lúp quanh con trỏ.
+    pub magnifier: CursorMagnifier,
+    /// E06 (v1): tiếng "tách" mỗi lần click.
+    pub click_sound: ClickSound,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum CursorStyle {
+    #[default]
+    Recorded,
+    MacOs,
+    Windows,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CursorSpotlight {
+    pub enabled: bool,
+    /// Bán kính vùng sáng, % cạnh ngắn của khung: 5–60.
+    pub size: f64,
+    /// Độ tối phần ngoài 0–1.
+    pub dim: f64,
+}
+
+impl Default for CursorSpotlight {
+    fn default() -> Self {
+        Self { enabled: false, size: 16.0, dim: 0.55 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CursorMagnifier {
+    pub enabled: bool,
+    /// Độ phóng 1,5–4×.
+    pub zoom: f64,
+    /// Bán kính kính lúp, % cạnh ngắn của khung: 8–40.
+    pub size: f64,
+}
+
+impl Default for CursorMagnifier {
+    fn default() -> Self {
+        Self { enabled: false, zoom: 2.0, size: 16.0 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ClickSound {
+    pub enabled: bool,
+    /// 0–100 %.
+    pub volume: f64,
+}
+
+impl Default for ClickSound {
+    fn default() -> Self {
+        Self { enabled: false, volume: 60.0 }
+    }
 }
 
 /// R13 / E06: highlight con trỏ kiểu Camtasia — chỉ là hiệu ứng khi render (không dính vào bản quay).
@@ -743,6 +848,11 @@ impl Default for CursorFx {
             smooth: true,
             click_effect: ClickEffect::Ripple,
             highlight: CursorHighlight::default(),
+            style: CursorStyle::Recorded,
+            motion_blur: 0.0,
+            spotlight: CursorSpotlight::default(),
+            magnifier: CursorMagnifier::default(),
+            click_sound: ClickSound::default(),
         }
     }
 }
@@ -801,6 +911,47 @@ pub struct CameraFx {
     pub border_color: String,
     /// Độ dày viền, phần trăm cạnh ngắn của webcam: 0,5–10.
     pub border_width: f64,
+    /// E08 (v1): bố cục — webcam góc (PiP), chỉ webcam, chia đôi, hai thẻ nổi.
+    pub layout: CameraLayout,
+    /// E08 (v1): nền phía sau người trong webcam (AI chạy trên máy).
+    pub background: CameraBackground,
+    /// E08 (v1): chroma key (phông xanh).
+    pub chroma: ChromaKey,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum CameraLayout {
+    #[default]
+    Pip,
+    CameraOnly,
+    Split,
+    Floating,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum CameraBackground {
+    #[default]
+    Keep,
+    Blur,
+    StrongBlur,
+    Remove,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChromaKey {
+    pub enabled: bool,
+    pub color: String,
+    /// Ngưỡng 1–100.
+    pub tolerance: f64,
+}
+
+impl Default for ChromaKey {
+    fn default() -> Self {
+        Self { enabled: false, color: "#00B140".into(), tolerance: 30.0 }
+    }
 }
 
 impl Default for CameraFx {
@@ -816,6 +967,9 @@ impl Default for CameraFx {
             border: false,
             border_color: "#FFFFFF".into(),
             border_width: 3.0,
+            layout: CameraLayout::Pip,
+            background: CameraBackground::Keep,
+            chroma: ChromaKey::default(),
         }
     }
 }

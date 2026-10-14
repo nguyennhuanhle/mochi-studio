@@ -5,12 +5,14 @@
 //! Mochi lo; Cap chỉ vẽ nền, khung, zoom, con trỏ, webcam tại một thời điểm trong media.
 
 use cap_project::{
-    AspectRatio, BackgroundSource, BorderConfiguration, CameraShape as CapCameraShape, CameraXPosition, CameraYPosition,
+    AspectRatio, BackgroundBlurMode, BackgroundSource, BorderConfiguration, CameraShape as CapCameraShape,
+    CameraXPosition, CameraYPosition, ChromaKeyConfig, CursorType, KeyboardData, KeyboardSettings,
     CornerStyle, GlideDirection, ProjectConfiguration, SceneMode, SceneSegment, ScreenMovementSpring,
     TimelineConfiguration, TimelineSegment, ZoomMode, ZoomSegment as CapZoom,
 };
 use mochi_project::{
-    BackgroundKind, CameraShape, ClickEffect, Corner, RecordingFx, ZoomSpeed, ZoomTarget,
+    BackgroundKind, CameraBackground, CameraLayout, CameraShape, ClickEffect, Corner, CursorStyle, KeysPosition,
+    RecordingFx, ZoomSpeed, ZoomTarget,
 };
 
 pub fn to_cap_config(
@@ -64,12 +66,25 @@ pub fn to_cap_config(
     c.cursor.size = fx.cursor.size.clamp(50.0, 300.0).round() as u32;
     c.cursor.raw = !fx.cursor.smooth;
     c.cursor.ripple.enabled = fx.cursor.click_effect == ClickEffect::Ripple;
-    // Nhòe / nghiêng con trỏ khi di chuyển và con trỏ SVG thay thế là hiệu ứng v1 của Cap, không có
-    // trong use case MVP (người dùng chọn gỡ, Phase 4 lượt 3): tắt, vẽ đúng ảnh con trỏ đã ghi.
-    c.cursor.motion_blur = 0.0;
+    // E06 (v1): nhòe khi di chuyển (tùy chọn, mặc định tắt) và bộ con trỏ thay thế (macOS / Windows).
+    // Nghiêng con trỏ của Cap vẫn tắt (không có trong use case).
+    c.cursor.motion_blur = fx.cursor.motion_blur.clamp(0.0, 1.0) as f32;
     c.cursor.rotation_amount = 0.0;
     c.cursor.base_rotation = 0.0;
-    c.cursor.use_svg = false;
+    match fx.cursor.style {
+        CursorStyle::Recorded => {
+            c.cursor.use_svg = false;
+            c.cursor.set_cursor_type(CursorType::Auto);
+        }
+        CursorStyle::MacOs => {
+            c.cursor.use_svg = true;
+            c.cursor.set_cursor_type(CursorType::MacOS);
+        }
+        CursorStyle::Windows => {
+            c.cursor.use_svg = true;
+            c.cursor.set_cursor_type(CursorType::Windows);
+        }
+    }
     // R13 / E06: highlight con trỏ (vá Cap `[MOCHI]`, vẽ dưới con trỏ, theo zoom, ẩn theo con trỏ).
     let h = fx.cursor.highlight.clone().clamped();
     let rgb = hex(&h.color);
@@ -108,6 +123,33 @@ pub fn to_cap_config(
             c.camera.shape = CapCameraShape::Source;
             c.camera.rounding = 20.0;
         }
+    }
+
+    // E08 (v1): nền webcam (tách người bằng model chạy trên máy) + chroma key.
+    c.camera.background_blur.mode = match cam.background {
+        CameraBackground::Keep => BackgroundBlurMode::Off,
+        CameraBackground::Blur => BackgroundBlurMode::Light,
+        CameraBackground::StrongBlur => BackgroundBlurMode::Heavy,
+        CameraBackground::Remove => BackgroundBlurMode::Remove,
+    };
+    c.camera.chroma_key = cam.chroma.enabled.then(|| ChromaKeyConfig {
+        color: hex(&cam.chroma.color),
+        tolerance: (cam.chroma.tolerance / 100.0).clamp(0.01, 1.0) as f32,
+    });
+
+    // R09 (v1): overlay phím bấm từ dữ liệu đã ghi.
+    if fx.keys.enabled {
+        let mut settings = KeyboardSettings::default();
+        settings.enabled = true;
+        settings.size = fx.keys.size.clamp(20.0, 120.0) as u32;
+        settings.position = match fx.keys.position {
+            KeysPosition::BottomCenter => "bottom-center",
+            KeysPosition::BottomLeft => "bottom-left",
+            KeysPosition::BottomRight => "bottom-right",
+            KeysPosition::TopCenter => "top-center",
+        }
+        .into();
+        c.keyboard = Some(KeyboardData { settings });
     }
 
     c.camera.border = Some(BorderConfiguration {
@@ -165,19 +207,45 @@ pub fn to_cap_config(
             edge_snap_ratio: 0.25,
         })
         .collect();
-    let scene_segments = cam
+    // E08: bố cục cả clip (v1) + các đoạn ẩn webcam (ẩn thắng bố cục), không chồng nhau.
+    let total: f64 = segment_secs.iter().sum();
+    let mut hidden: Vec<(f64, f64)> = cam
         .hidden_ranges
         .iter()
         .filter(|r| r.end > r.start)
-        .map(|r| SceneSegment {
-            start: r.start.secs(),
-            end: r.end.secs(),
-            mode: SceneMode::HideCamera,
-            split_layout: None,
-            transition_in: 0.25,
-            transition_out: 0.25,
-        })
+        .map(|r| (r.start.secs().max(0.0), r.end.secs().min(total.max(r.end.secs()))))
         .collect();
+    hidden.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let scene = |start: f64, end: f64, mode: SceneMode| SceneSegment {
+        start,
+        end,
+        mode,
+        split_layout: None,
+        transition_in: 0.25,
+        transition_out: 0.25,
+    };
+    let base = match cam.layout {
+        CameraLayout::Pip => None,
+        CameraLayout::CameraOnly => Some(SceneMode::CameraOnly),
+        CameraLayout::Split => Some(SceneMode::SplitScreen),
+        CameraLayout::Floating => Some(SceneMode::Floating),
+    };
+    let mut scene_segments = Vec::new();
+    let mut at = 0.0;
+    for (s, e) in &hidden {
+        if let Some(mode) = base
+            && *s > at
+        {
+            scene_segments.push(scene(at, *s, mode));
+        }
+        scene_segments.push(scene(*s, *e, SceneMode::HideCamera));
+        at = at.max(*e);
+    }
+    if let Some(mode) = base
+        && total > at
+    {
+        scene_segments.push(scene(at, total, mode));
+    }
     let mut timeline = c.timeline.take().unwrap_or_else(empty_timeline);
     timeline.segments = segments;
     timeline.zoom_segments = zoom_segments;

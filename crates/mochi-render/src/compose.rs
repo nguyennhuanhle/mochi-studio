@@ -70,9 +70,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let sdf = rounded_box(in.local, half, u.c.w);
         let inside = clamp(0.5 - sdf, 0.0, 1.0);
         if (inside <= 0.0) { discard; }
-        let uv = (in.local / half) * 0.5 + vec2<f32>(0.5);
+        var uv = (in.local / half) * 0.5 + vec2<f32>(0.5);
+        // h = vùng con của ảnh (uv x0, y0, x1, y1) — kính lúp; h rỗng = cả ảnh.
+        if (u.h.z > u.h.x) { uv = mix(u.h.xy, u.h.zw, uv); }
         let half_texel = 0.5 / vec2<f32>(textureDimensions(tex));
-        let c = textureSample(tex, samp, min(uv * u.c.xy, u.c.xy - half_texel));
+        let c = textureSample(tex, samp, clamp(uv * u.c.xy, half_texel, u.c.xy - half_texel));
         var rgb = adjust(c.rgb);
         var a = c.a;
         if (u.d.x > 0.0) {

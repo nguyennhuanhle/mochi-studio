@@ -4635,7 +4635,8 @@ impl ProjectUniforms {
                             * final_target_size[0].min(final_target_size[1])
                     }),
                     preserve_source_alpha: 0.0,
-                    _padding1: [0.0; 3],
+                    // [MOCHI] chroma key webcam (0 = tắt).
+                    _padding1: project.camera.chroma_key.map_or([0.0; 3], |k| k.uniform()),
                     border_color: camera_border.map_or([0.0; 4], |b| {
                         [
                             b.color[0] as f32 / 255.0,
@@ -4769,7 +4770,8 @@ impl ProjectUniforms {
                     border_enabled: 0.0,
                     border_width: 0.0,
                     preserve_source_alpha: 0.0,
-                    _padding1: [0.0; 3],
+                    // [MOCHI] chroma key cả ở chế độ chỉ webcam.
+                    _padding1: project.camera.chroma_key.map_or([0.0; 3], |k| k.uniform()),
                     border_color: [0.0, 0.0, 0.0, 0.0],
                     corner_radii: [1.0; 4],
                     color_adjust_a: camera_color_grade.color_adjust_a,
@@ -5364,7 +5366,8 @@ mod tests {
                             ..Default::default()
                         };
                         camera.background_blur.mode = cap_project::BackgroundBlurMode::Remove;
-                        let padding = if cfg!(target_os = "macos") { 0.0 } else { 50.0 };
+                        // [MOCHI] xóa nền (cutout) bật cả trên Windows → không có lề.
+                        let padding = 0.0;
                         let expected_x = match x {
                             CameraXPosition::Left => padding,
                             CameraXPosition::Center => (output[0] - subject[0]) / 2.0,
@@ -5675,13 +5678,11 @@ mod style_image_tests {
         for frame in [60, 108, 288, 330] {
             let uniforms = at(&project, frame);
             let camera = uniforms.camera.expect("overlay");
-            assert_eq!(
-                camera.preserve_source_alpha,
-                if cfg!(target_os = "macos") { 1.0 } else { 0.0 }
-            );
+            // [MOCHI] xóa nền bật cả trên Windows.
+            assert_eq!(camera.preserve_source_alpha, 1.0);
             assert_eq!(
                 uniforms.camera_background_effect_mode(),
-                cfg!(target_os = "macos").then_some(cap_camera_effects::BlurMode::Remove)
+                Some(cap_camera_effects::BlurMode::Remove)
             );
             if let Some(camera_only) = uniforms.camera_only {
                 assert_eq!(camera_only.preserve_source_alpha, 0.0);
@@ -8148,9 +8149,8 @@ fn blur_mode_from_config(
         cap_project::BackgroundBlurMode::Off => None,
         cap_project::BackgroundBlurMode::Light => Some(cap_camera_effects::BlurMode::Light),
         cap_project::BackgroundBlurMode::Heavy => Some(cap_camera_effects::BlurMode::Heavy),
-        cap_project::BackgroundBlurMode::Remove => {
-            cfg!(target_os = "macos").then_some(cap_camera_effects::BlurMode::Remove)
-        }
+        // [MOCHI] bật cả trên Windows (pipeline tách nền dùng chung; ONNX Runtime CPU đi kèm installer).
+        cap_project::BackgroundBlurMode::Remove => Some(cap_camera_effects::BlurMode::Remove),
     }
 }
 
@@ -9280,6 +9280,13 @@ mod initial_decode_recovery_tests {
     }
 }
 
+
+impl RendererLayers {
+    /// [MOCHI] Vị trí con trỏ của frame vừa render (pixel khung đầu ra, sau zoom) + độ hiện.
+    pub fn mochi_cursor(&self) -> Option<([f64; 2], f32)> {
+        self.cursor.mochi_cursor()
+    }
+}
 
 /// [MOCHI] Render một frame của bản quay vào `session` và trả về texture kết quả TRÊN GPU
 /// (không đọc ngược về CPU như `FrameRenderer`). Các bước giống `produce_frame_with_timings`.

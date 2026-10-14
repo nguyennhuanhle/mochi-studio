@@ -53,13 +53,15 @@
       "../../../target/release/swscale-8.dll": "swscale-8.dll",
       "../../../target/release/dxcompiler.dll": "dxcompiler.dll",
       "../../../target/release/dxil.dll": "dxil.dll",
+      "../../../target/release/onnxruntime.dll": "onnxruntime.dll",
       "../../../legal/LICENSE-AGPL-3.0.txt": "licenses/LICENSE-AGPL-3.0.txt",
       "../../../NOTICE": "licenses/NOTICE.txt",
       "../../../THIRD_PARTY.md": "licenses/THIRD_PARTY.md",
       "../../../legal/third-party-crates.txt": "licenses/third-party-crates.txt",
       "../../../target/native-deps/FFMPEG-LICENSE.txt": "licenses/FFMPEG-LICENSE.txt",
       "../../../legal/CAP-LICENSE.txt": "licenses/CAP-LICENSE.txt",
-      "../../../legal/CAP-LICENSE-MIT.txt": "licenses/CAP-LICENSE-MIT.txt"
+      "../../../legal/CAP-LICENSE-MIT.txt": "licenses/CAP-LICENSE-MIT.txt",
+      "../../../target/native-deps/ort/ONNXRUNTIME-LICENSE.txt": "licenses/ONNXRUNTIME-LICENSE.txt"
     },
     "windows": {
       "nsis": {

@@ -528,10 +528,17 @@ pub fn spawn_cursor_recorder(
             };
 
             if position_changed {
+                // [MOCHI] R01 v1: khung cắt dời theo cửa sổ đang bám theo.
+                let (follow_dx, follow_dy) = scap_targets::mochi_follow::get();
+                let crop_now = if follow_dx != 0 || follow_dy != 0 {
+                    crop_bounds.mochi_shifted(follow_dx as f64, follow_dy as f64)
+                } else {
+                    crop_bounds
+                };
                 let cropped_norm_pos = position
                     .relative_to_display(display)
                     .and_then(|p| p.normalize())
-                    .map(|p| p.with_crop(crop_bounds))
+                    .map(|p| p.with_crop(crop_now))
                     .map(|p| (p.x(), p.y()));
                 #[cfg(target_os = "linux")]
                 let cropped_norm_pos = if target.window.is_some() {

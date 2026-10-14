@@ -10,6 +10,7 @@ pub mod disk;
 mod error;
 mod events;
 pub mod finalize;
+mod follow;
 pub mod meter;
 pub mod recovery;
 mod service;

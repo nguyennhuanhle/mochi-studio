@@ -26,6 +26,8 @@ pub struct CapRecordingLayer {
     zoom: Vec<ZoomTransformTimeline>,
     cursor: Vec<PrecomputedCursorTimeline>,
     fps: u32,
+    /// Vị trí con trỏ (pixel khung vừa render, sau zoom) + độ hiện — cho spotlight / kính lúp (E06 v1).
+    last_cursor: Option<([f64; 2], f32)>,
 }
 
 impl CapRecordingLayer {
@@ -75,6 +77,7 @@ impl CapRecordingLayer {
             zoom: vec![],
             cursor: vec![],
             fps,
+            last_cursor: None,
         })
     }
 
@@ -88,6 +91,34 @@ impl CapRecordingLayer {
             return;
         }
         self.config = fx_map::to_cap_config(fx, canvas, &self.segment_secs, self.has_camera);
+        // R09 (v1): overlay phím bấm — gom sự kiện phím của từng segment thành đoạn hiển thị (thời gian
+        // trong media, các segment nối liền).
+        if let Some(kb) = &self.config.keyboard
+            && let Some(timeline) = self.config.timeline.as_mut()
+        {
+            let s = &kb.settings;
+            let mut offset = 0.0;
+            timeline.keyboard_segments = self
+                .segments
+                .iter()
+                .zip(&self.segment_secs)
+                .flat_map(|(seg, len)| {
+                    let mut ks = cap_project::group_key_events(
+                        &seg.keyboard,
+                        s.grouping_threshold_ms,
+                        s.linger_duration as f64 * 1000.0,
+                        s.show_modifiers,
+                        s.show_special_keys,
+                    );
+                    for k in &mut ks {
+                        k.start += offset;
+                        k.end += offset;
+                    }
+                    offset += len;
+                    ks
+                })
+                .collect();
+        }
         let smoothing = (!self.config.cursor.raw).then_some(SpringMassDamperSimulationConfig {
             tension: self.config.cursor.tension,
             mass: self.config.cursor.mass,
@@ -161,6 +192,11 @@ impl CapRecordingLayer {
         )
         .await
         .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        self.last_cursor = self.layers.mochi_cursor();
         Ok(GpuFrame::whole(tex.create_view(&Default::default()), tex.width(), tex.height()))
+    }
+
+    pub fn last_cursor(&self) -> Option<([f64; 2], f32)> {
+        self.last_cursor
     }
 }

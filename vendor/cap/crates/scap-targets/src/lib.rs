@@ -1,6 +1,24 @@
 pub mod bounds;
 pub mod platform;
 
+/// [MOCHI] R01 v1: quay cửa sổ "bám theo" khi cửa sổ bị kéo đi. Độ dời (pixel vật lý) của cửa sổ so
+/// với lúc bắt đầu đoạn quay hiện tại; khung cắt của bản quay và chuẩn hóa vị trí con trỏ cùng dời theo.
+pub mod mochi_follow {
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    static DX: AtomicI32 = AtomicI32::new(0);
+    static DY: AtomicI32 = AtomicI32::new(0);
+
+    pub fn set(dx: i32, dy: i32) {
+        DX.store(dx, Ordering::Relaxed);
+        DY.store(dy, Ordering::Relaxed);
+    }
+
+    pub fn get() -> (i32, i32) {
+        (DX.load(Ordering::Relaxed), DY.load(Ordering::Relaxed))
+    }
+}
+
 use bounds::*;
 pub use platform::{DisplayIdImpl, DisplayImpl, WindowIdImpl, WindowImpl};
 use serde::{Deserialize, Serialize};

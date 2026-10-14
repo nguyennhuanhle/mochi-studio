@@ -66,6 +66,8 @@ struct Session {
     tasks: Vec<tokio::task::JoinHandle<()>>,
     /// R03 + R07: cửa sổ active, khoảng mất thiết bị → `mochi-recording.json`.
     activity: crate::activity::ActivityLog,
+    /// R01 (v1): bám theo cửa sổ đang quay.
+    follow: Option<crate::follow::Follow>,
 }
 
 #[derive(Default)]
@@ -201,6 +203,11 @@ impl RecorderService {
             }
         };
 
+        // R01 (v1): bám theo cửa sổ đang quay.
+        let follow = match &config.target {
+            CaptureTarget::Window { id } => crate::follow::Follow::start(id),
+            _ => None,
+        };
         Ok(Session {
             config,
             project_dir,
@@ -216,6 +223,7 @@ impl RecorderService {
             mic_muted: false,
             tasks,
             activity: Default::default(),
+            follow,
         })
     }
 
@@ -385,6 +393,10 @@ impl RecorderService {
                 return Err(RecorderError::TargetNotFound);
             }
             resolve_target(&session.config.target)?;
+            // R01 (v1): đoạn mới cắt theo vị trí cửa sổ lúc quay tiếp → độ dời bám theo về 0.
+            if let Some(f) = &session.follow {
+                f.rebase();
+            }
             session.actor.resume().await.map_err(RecorderError::internal)?;
             session.state = RecorderState::Recording;
             if let Some(since) = session.clock.paused_since.take() {
@@ -750,6 +762,7 @@ mod cpal_error {
 fn reset_global_capture_state() {
     set_studio_health_sender(None);
     set_keyboard_capture_filter(KeyboardCaptureFilter::Off);
+    scap_targets::mochi_follow::set(0, 0);
 }
 
 fn track_kind(track: &str) -> DeviceKind {

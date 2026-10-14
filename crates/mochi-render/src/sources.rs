@@ -97,6 +97,14 @@ impl Source {
         }
     }
 
+    /// Vị trí con trỏ của frame vừa lấy (chỉ bản quay đã polish).
+    pub fn cursor(&self) -> Option<([f64; 2], f32)> {
+        match self {
+            Source::Polished(layer) => layer.last_cursor(),
+            _ => None,
+        }
+    }
+
     pub fn is_hardware(&self) -> Option<bool> {
         match self {
             Source::Video(v) => Some(v.decoder.is_hardware_accelerated()),

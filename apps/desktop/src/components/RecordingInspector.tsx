@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { commands, type Clip, type EditOp, type FxPreset, type MediaItem, type RecordingFx, type Ticks, type ZoomSegment } from "../bindings";
+import {
+  commands,
+  type CameraBackground,
+  type CameraLayout,
+  type Clip,
+  type CursorStyle,
+  type EditOp,
+  type FxPreset,
+  type KeysFx,
+  type KeysPosition,
+  type MediaItem,
+  type RecordingFx,
+  type Ticks,
+  type ZoomSegment,
+} from "../bindings";
 import { formatTimecode, secs, ticks } from "../lib/editor";
 import { Check, ColorField, Section, Select, Slider } from "./controls";
 import HighlightControls from "./HighlightControls";
@@ -47,6 +61,24 @@ export default function RecordingInspector(props: {
   const set = (patch: (f: RecordingFx) => RecordingFx) =>
     props.apply({ op: "setRecordingFx", clipId: clip.id, fx: patch(structuredClone(fx)) });
   const bg = fx.background;
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  // Trường v1 có thể vắng trong project cũ → giá trị mặc định (giống Rust).
+  const cur = {
+    style: fx.cursor.style ?? "recorded",
+    motionBlur: fx.cursor.motionBlur ?? 0,
+    spotlight: fx.cursor.spotlight ?? { enabled: false, size: 16, dim: 0.55 },
+    magnifier: fx.cursor.magnifier ?? { enabled: false, zoom: 2, size: 16 },
+    clickSound: fx.cursor.clickSound ?? { enabled: false, volume: 60 },
+  };
+  const setCursor = (patch: Partial<typeof cur>) => set((f) => ({ ...f, cursor: { ...f.cursor, ...cur, ...patch } }));
+  const cam = {
+    layout: fx.camera.layout ?? "pip",
+    background: fx.camera.background ?? "keep",
+    chroma: fx.camera.chroma ?? { enabled: false, color: "#00B140", tolerance: 30 },
+  };
+  const setCam = (patch: Partial<typeof cam>) => set((f) => ({ ...f, camera: { ...f.camera, ...cam, ...patch } }));
+  const keys: KeysFx = fx.keys ?? { enabled: false, position: "bottomCenter", size: 50 };
+  const setKeys = (patch: Partial<KeysFx>) => set((f) => ({ ...f, keys: { ...keys, ...patch } }));
   // Kiểu nền trước khi tắt "Nền & khung" → bật lại thì trả về kiểu đó.
   const [lastKind, setLastKind] = useState<"color" | "gradient" | "image">(bg.kind === "none" ? "gradient" : bg.kind);
   useEffect(() => {
@@ -143,8 +175,51 @@ export default function RecordingInspector(props: {
               onChange={(highlight) => set((f) => ({ ...f, cursor: { ...f.cursor, highlight } }))}
               disabledReason={props.media?.recording?.hasCursor === false ? t("highlight.noCursorData") : undefined}
             />
+            {/* E06 (v1): kiểu con trỏ, nhòe, spotlight, kính lúp, tiếng click. */}
+            <Select<CursorStyle>
+              label={t("cursor.style")}
+              value={cur.style}
+              options={(["recorded", "macOs", "windows"] as CursorStyle[]).map((v) => ({ value: v, label: t(`cursor.style_${v}`) }))}
+              onChange={(style) => setCursor({ style })}
+            />
+            <Slider label={t("cursor.motionBlur")} value={cur.motionBlur} min={0} max={1} step={0.05} format={pct} onCommit={(motionBlur) => setCursor({ motionBlur })} />
+            <Check label={t("cursor.spotlight")} checked={cur.spotlight.enabled} onChange={(enabled) => setCursor({ spotlight: { ...cur.spotlight, enabled } })} />
+            {cur.spotlight.enabled && (
+              <>
+                <Slider label={t("cursor.spotlightSize")} value={cur.spotlight.size} min={5} max={60} format={(v) => `${Math.round(v)}%`} onCommit={(size) => setCursor({ spotlight: { ...cur.spotlight, size } })} />
+                <Slider label={t("cursor.spotlightDim")} value={cur.spotlight.dim} min={0} max={1} step={0.05} format={pct} onCommit={(dim) => setCursor({ spotlight: { ...cur.spotlight, dim } })} />
+              </>
+            )}
+            <Check label={t("cursor.magnifier")} checked={cur.magnifier.enabled} onChange={(enabled) => setCursor({ magnifier: { ...cur.magnifier, enabled } })} />
+            {cur.magnifier.enabled && (
+              <>
+                <Slider label={t("cursor.magnifierZoom")} value={cur.magnifier.zoom} min={1.5} max={4} step={0.1} format={(v) => `${v.toFixed(1)}×`} onCommit={(zoom) => setCursor({ magnifier: { ...cur.magnifier, zoom } })} />
+                <Slider label={t("cursor.magnifierSize")} value={cur.magnifier.size} min={8} max={40} format={(v) => `${Math.round(v)}%`} onCommit={(size) => setCursor({ magnifier: { ...cur.magnifier, size } })} />
+              </>
+            )}
+            <Check label={t("cursor.clickSound")} checked={cur.clickSound.enabled} onChange={(enabled) => setCursor({ clickSound: { ...cur.clickSound, enabled } })} />
+            {cur.clickSound.enabled && (
+              <Slider label={t("cursor.clickVolume")} value={cur.clickSound.volume} min={0} max={100} format={(v) => `${Math.round(v)}%`} onCommit={(volume) => setCursor({ clickSound: { ...cur.clickSound, volume } })} />
+            )}
           </>
         )}
+      </Section>
+
+      {/* R09 (v1): overlay phím bấm từ dữ liệu ghi phím. */}
+      <Section title={t("keys.title")} defaultOpen={keys.enabled}>
+        <Check label={t("keys.enabled")} checked={keys.enabled} onChange={(enabled) => setKeys({ enabled })} />
+        {keys.enabled && (
+          <>
+            <Select<KeysPosition>
+              label={t("keys.position")}
+              value={keys.position}
+              options={(["bottomCenter", "bottomLeft", "bottomRight", "topCenter"] as KeysPosition[]).map((v) => ({ value: v, label: t(`keys.pos_${v}`) }))}
+              onChange={(position) => setKeys({ position })}
+            />
+            <Slider label={t("keys.size")} value={keys.size} min={20} max={120} format={(v) => `${Math.round(v)} px`} onCommit={(size) => setKeys({ size })} />
+          </>
+        )}
+        <p className="muted small">{t("keys.hint")}</p>
       </Section>
 
       <Section title={t("polish.camera")} defaultOpen={hasCamera}>
@@ -206,6 +281,26 @@ export default function RecordingInspector(props: {
             )}
             <Slider label={t("polish.cameraSize")} value={fx.camera.size} min={10} max={50} format={(v) => `${Math.round(v)}%`} onCommit={(size) => set((f) => ({ ...f, camera: { ...f.camera, size } }))} />
             <Check label={t("polish.mirror")} checked={fx.camera.mirror} onChange={(mirror) => set((f) => ({ ...f, camera: { ...f.camera, mirror } }))} />
+            {/* E08 (v1): bố cục, nền sau người (AI chạy trên máy), chroma key. */}
+            <Select<CameraLayout>
+              label={t("cam.layout")}
+              value={cam.layout}
+              options={(["pip", "cameraOnly", "split", "floating"] as CameraLayout[]).map((v) => ({ value: v, label: t(`cam.layout_${v}`) }))}
+              onChange={(layout) => setCam({ layout })}
+            />
+            <Select<CameraBackground>
+              label={t("cam.background")}
+              value={cam.background}
+              options={(["keep", "blur", "strongBlur", "remove"] as CameraBackground[]).map((v) => ({ value: v, label: t(`cam.bg_${v}`) }))}
+              onChange={(background) => setCam({ background })}
+            />
+            <Check label={t("cam.chroma")} checked={cam.chroma.enabled} onChange={(enabled) => setCam({ chroma: { ...cam.chroma, enabled } })} />
+            {cam.chroma.enabled && (
+              <>
+                <ColorField label={t("cam.chromaColor")} value={cam.chroma.color} onCommit={(color) => setCam({ chroma: { ...cam.chroma, color } })} />
+                <Slider label={t("cam.chromaTolerance")} value={cam.chroma.tolerance} min={1} max={100} format={(v) => `${Math.round(v)}%`} onCommit={(tolerance) => setCam({ chroma: { ...cam.chroma, tolerance } })} />
+              </>
+            )}
             <Check label={t("polish.cameraBorder")} checked={fx.camera.border} onChange={(border) => set((f) => ({ ...f, camera: { ...f.camera, border } }))} />
             {fx.camera.border && (
               <>

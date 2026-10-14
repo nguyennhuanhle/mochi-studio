@@ -37,6 +37,8 @@ struct MixState {
     project: Option<Arc<Project>>,
     /// media id → các luồng tiếng đã giải mã.
     streams: HashMap<String, Vec<Stream>>,
+    /// E06 (v1): bản quay → thời điểm click (giây trong media), cho tiếng click.
+    clicks: HashMap<String, Arc<Vec<f64>>>,
 }
 
 pub struct AudioEngine {
@@ -127,7 +129,13 @@ impl AudioEngine {
                 .name("mochi-audio-decode".into())
                 .spawn(move || {
                     let streams = decode_streams(kind, &path);
-                    state.lock().unwrap().streams.insert(id.clone(), streams);
+                    let clicks = (kind == MediaKind::Recording).then(|| Arc::new(mochi_project::autozoom::click_times(&path)));
+                    let mut st = state.lock().unwrap();
+                    st.streams.insert(id.clone(), streams);
+                    if let Some(c) = clicks {
+                        st.clicks.insert(id.clone(), c);
+                    }
+                    drop(st);
                     loading.lock().unwrap().remove(&id);
                 })
                 .ok();
@@ -243,18 +251,32 @@ impl OfflineMixer {
             .iter()
             .filter(|m| m.kind != MediaKind::Image)
             .filter_map(|m| paths.get(&m.id).map(|p| (m.id.clone(), m.kind, p.clone())))
-            .map(|(id, kind, path)| std::thread::spawn(move || (id, decode_streams(kind, &path))))
+            .map(|(id, kind, path)| {
+                std::thread::spawn(move || {
+                    let clicks = (kind == MediaKind::Recording).then(|| Arc::new(mochi_project::autozoom::click_times(&path)));
+                    (id, decode_streams(kind, &path), clicks)
+                })
+            })
             .collect();
-        let streams = jobs.into_iter().filter_map(|j| j.join().ok()).collect();
-        Self { st: MixState { project: Some(project), streams } }
+        let mut streams = HashMap::new();
+        let mut clicks = HashMap::new();
+        for (id, s, c) in jobs.into_iter().filter_map(|j| j.join().ok()) {
+            if let Some(c) = c {
+                clicks.insert(id.clone(), c);
+            }
+            streams.insert(id, s);
+        }
+        Self { st: MixState { project: Some(project), streams, clicks } }
     }
 
     /// Có clip nào phát ra tiếng không (không thì khỏi tạo luồng AAC).
     pub fn has_audio(&self) -> bool {
         let Some(p) = &self.st.project else { return false };
         p.clips.iter().any(|c| {
+            let clicks = matches!(&c.content, ClipContent::Recording { fx } if fx.cursor.click_sound.enabled)
+                && c.media_id.as_ref().is_some_and(|id| self.st.clicks.get(id).is_some_and(|k| !k.is_empty()));
             !c.muted
-                && c.media_id.as_ref().is_some_and(|id| self.st.streams.get(id).is_some_and(|s| !s.is_empty()))
+                && (clicks || c.media_id.as_ref().is_some_and(|id| self.st.streams.get(id).is_some_and(|s| !s.is_empty())))
                 && p.tracks.iter().any(|t| t.id == c.track_id && !t.muted && t.kind != TrackKind::Overlay)
         })
     }
@@ -303,6 +325,44 @@ fn open_output(
     Ok(stream)
 }
 
+/// E06 (v1): tiếng "tách" ngắn (~40 ms) tổng hợp, `t` giây tính từ lúc click.
+const CLICK_LEN: f64 = 0.04;
+fn click_wave(t: f64) -> f32 {
+    let env = (-t / 0.0045).exp();
+    (env * (0.6 * (std::f64::consts::TAU * 3200.0 * t).sin() + 0.4 * (std::f64::consts::TAU * 1400.0 * t).sin()) * 0.5) as f32
+}
+
+/// Cộng tiếng click của clip bản quay (đã bật) vào `out`.
+fn mix_clicks(st: &MixState, clip: &mochi_project::Clip, gain: f32, start: i64, tick_per_frame: f64, frames: usize, channels: usize, out: &mut [f32]) {
+    let ClipContent::Recording { fx } = &clip.content else { return };
+    if !fx.cursor.click_sound.enabled || clip.hold.is_some() {
+        return;
+    }
+    let Some(clicks) = clip.media_id.as_ref().and_then(|id| st.clicks.get(id)) else { return };
+    let tps = mochi_project::TICKS_PER_SECOND as f64;
+    let vol = gain * (fx.cursor.click_sound.volume / 100.0) as f32;
+    let (src_in, src_out) = (clip.source_in.secs(), clip.source_out.secs());
+    let win_start = start as f64;
+    let win_end = start as f64 + frames as f64 * tick_per_frame;
+    for &c in clicks.iter().filter(|&&c| c >= src_in && c < src_out) {
+        let at = clip.start.0 as f64 + (c - src_in) / clip.speed * tps;
+        if at + CLICK_LEN * tps < win_start || at > win_end {
+            continue;
+        }
+        let i0 = (((at - win_start) / tick_per_frame).floor().max(0.0)) as usize;
+        let i1 = ((((at + CLICK_LEN * tps) - win_start) / tick_per_frame).ceil().max(0.0) as usize).min(frames);
+        for i in i0..i1 {
+            let dt = (win_start + i as f64 * tick_per_frame - at) / tps;
+            if (0.0..CLICK_LEN).contains(&dt) {
+                let v = click_wave(dt) * vol;
+                for ch in 0..channels {
+                    out[i * channels + ch] += v;
+                }
+            }
+        }
+    }
+}
+
 fn db_to_gain(db: f64) -> f32 {
     10f64.powf(db / 20.0) as f32
 }
@@ -325,10 +385,11 @@ fn mix(st: &MixState, start: i64, tick_per_frame: f64, frames: usize, channels: 
         if matches!(clip.content, ClipContent::Image) || clip.content.is_overlay() {
             continue;
         }
+        let gain = db_to_gain(clip.volume_db + track.volume_db);
+        mix_clicks(st, clip, gain, start, tick_per_frame, frames, channels, out);
         let Some(streams) = clip.media_id.as_ref().and_then(|id| st.streams.get(id)) else {
             continue;
         };
-        let gain = db_to_gain(clip.volume_db + track.volume_db);
         let dur = clip.duration().0 as f64;
         for i in 0..frames {
             let t = start as f64 + i as f64 * tick_per_frame;

@@ -8,6 +8,7 @@
 | MediaPipe Selfie Segmentation (`camera-effects/assets/selfie_segmentation.onnx`) | Google MediaPipe | Apache-2.0 according to secondary sources (**still to be confirmed against the official model card**) | Embedded in the executable (`include_bytes!`) for webcam blur / background removal |
 | wgpu-hal 25.0.2 (patched) | gfx-rs/wgpu PR 7550 | MIT OR Apache-2.0 | `vendor/wgpu-hal` |
 | FFmpeg 7.1 shared | GyanD/codexffmpeg | GPL-3.0 (build includes x264) | Dynamically linked; downloaded by `scripts/setup.ps1` |
+| ONNX Runtime 1.24.4 (CPU build) | Microsoft (NuGet `Microsoft.ML.OnnxRuntime`) | MIT | Shipped with the installer; runs the webcam segmentation model on the CPU (background blur / removal, E08). Downloaded by `scripts/setup.ps1` |
 | DXC 1.9.2607 | Microsoft (NuGet `Microsoft.Direct3D.DXC`) | NCSA / MIT | Optional |
 | gifski | crates.io | AGPL-3.0 | Through `cap-enc-gif` |
 | Tauri, wgpu, React, … | crates.io / npm | MIT / Apache-2.0 | |

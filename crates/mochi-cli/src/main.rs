@@ -8,6 +8,8 @@ mod phase4_editor;
 mod phase4_system;
 mod phase5_highlight;
 mod phase6_render;
+mod phase6_recording;
+mod follow_window;
 mod editor_scenario;
 mod export_cmd;
 mod export_scenario;
@@ -109,6 +111,10 @@ enum Command {
     Phase5Highlight,
     /// Phase 6 lượt B: compositor v1 (keyframe, chuyển cảnh, khung thiết bị, hình khối, callout, spotlight)
     Phase6Render,
+    /// Phase 6 lượt C: hiệu ứng bản quay (spotlight / kính lúp / kiểu con trỏ / tiếng click, webcam, phím bấm)
+    Phase6Recording,
+    /// R01 v1: quay một cửa sổ thử rồi kéo nó đi — bản quay phải bám theo
+    FollowWindow,
     /// Phase 4: quay vùng 64×64 + webcam + mic (Tiêu chuẩn, 60 fps); người dùng rút thiết bị giữa chừng (R06, R07)
     DeviceLoss {
         #[arg(long, default_value_t = 25)]
@@ -207,6 +213,8 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Phase4System => phase4_system::run().await,
         Command::Phase5Highlight => phase5_highlight::run().await,
         Command::Phase6Render => phase6_render::run().await,
+        Command::Phase6Recording => phase6_recording::run().await,
+        Command::FollowWindow => follow_window::run().await,
         Command::DeviceLoss { secs, camera, mic, pause_at, keep } => {
             device_scenario::run(secs, &camera, &mic, pause_at, keep).await
         }
