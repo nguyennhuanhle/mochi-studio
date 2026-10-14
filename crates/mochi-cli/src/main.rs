@@ -11,6 +11,7 @@ mod phase6_render;
 mod phase6_recording;
 mod follow_window;
 mod app_audio;
+mod whisper_test;
 mod phase6_audio;
 mod phase6_captions;
 mod editor_scenario;
@@ -120,6 +121,10 @@ enum Command {
     FollowWindow,
     /// R10 v1: quay cửa sổ thử với "chỉ thu tiếng app" (không phát tiếng ra loa)
     AppAudio,
+    /// R10 v1: như app-audio nhưng HAI app thử phát tiếng (cần người dùng cho phép phát âm thanh)
+    AppAudioAudible,
+    /// E13 v1: tải model Whisper tiny (nếu chưa có) rồi phiên âm một đoạn giọng đọc Windows
+    WhisperTest,
     /// Phase 6 lượt D: khử ồn, chuẩn hóa, nén, ducking trên âm thanh tổng hợp
     Phase6Audio,
     /// Phase 6 lượt E: phụ đề (SRT, burn-in, phụ đề động, xuất kèm .srt)
@@ -225,6 +230,8 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Phase6Recording => phase6_recording::run().await,
         Command::FollowWindow => follow_window::run().await,
         Command::AppAudio => app_audio::run().await,
+        Command::AppAudioAudible => app_audio::run_audible().await,
+        Command::WhisperTest => whisper_test::run().await,
         Command::Phase6Audio => phase6_audio::run().await,
         Command::Phase6Captions => phase6_captions::run().await,
         Command::DeviceLoss { secs, camera, mic, pause_at, keep } => {

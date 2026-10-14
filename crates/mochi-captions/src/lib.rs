@@ -156,15 +156,28 @@ pub fn transcribe(
     params.set_print_timestamps(false);
     params.set_print_special(false);
     params.set_progress_callback_safe(progress);
-    let stop = cancel.clone();
     // whisper gọi hàm này đều đặn trong lúc tính: `hold` bật (đang quay) → đứng chờ tại đây, tức là
-    // tạm dừng phiên âm cho tới khi dừng quay, không giành CPU với bản quay.
-    params.set_abort_callback_safe(move || {
-        while hold.load(Ordering::Relaxed) && !stop.load(Ordering::Relaxed) {
+    // tạm dừng phiên âm cho tới khi dừng quay, không giành CPU với bản quay. Trả true = hủy.
+    // Không dùng `set_abort_callback_safe` của whisper-rs 0.16: nó cất closure dạng
+    // `Box<Box<dyn FnMut>>` nhưng trampoline đọc như closure cụ thể → đọc rác, whisper hủy ngẫu nhiên
+    // ("failed to encode", mã −6).
+    unsafe extern "C" fn should_abort(data: *mut std::ffi::c_void) -> bool {
+        let flags = unsafe { &*(data as *const AbortFlags) };
+        while flags.hold.load(Ordering::Relaxed) && !flags.cancel.load(Ordering::Relaxed) {
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
-        stop.load(Ordering::Relaxed)
-    });
+        flags.cancel.load(Ordering::Relaxed)
+    }
+    struct AbortFlags {
+        cancel: Arc<AtomicBool>,
+        hold: Arc<AtomicBool>,
+    }
+    // `flags` sống tới hết hàm, lâu hơn lời gọi `state.full` dùng con trỏ của nó.
+    let flags = AbortFlags { cancel: cancel.clone(), hold };
+    unsafe {
+        params.set_abort_callback(Some(should_abort));
+        params.set_abort_callback_user_data(&flags as *const AbortFlags as *mut std::ffi::c_void);
+    }
     state.full(params, pcm).map_err(|e| if cancel.load(Ordering::Relaxed) { "đã hủy".to_string() } else { format!("phiên âm lỗi: {e}") })?;
 
     // whisper: mốc thời gian theo đơn vị 10 ms.
