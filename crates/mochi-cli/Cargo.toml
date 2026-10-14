@@ -1,0 +1,39 @@
+[package]
+name = "mochi-cli"
+description = "Công cụ dev của Mochi Studio: quay / kiểm tra / render từ dòng lệnh để kiểm thử thật"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "mochi-cli"
+path = "src/main.rs"
+
+[dependencies]
+cap-recording = { path = "../../vendor/cap/crates/recording" }
+cap-project = { path = "../../vendor/cap/crates/project" }
+cap-camera = { path = "../../vendor/cap/crates/camera" }
+mochi-recorder = { path = "../mochi-recorder" }
+mochi-project = { path = "../mochi-project" }
+mochi-timeline = { path = "../mochi-timeline" }
+mochi-editor = { path = "../mochi-editor" }
+mochi-render = { path = "../mochi-render" }
+mochi-preview = { path = "../mochi-preview" }
+mochi-export = { path = "../mochi-export" }
+mochi-jobs = { path = "../mochi-jobs" }
+image = { version = "0.25", default-features = false, features = ["png"] }
+anyhow = { workspace = true }
+clap = { version = "4.5.23", features = ["derive"] }
+flume = { workspace = true }
+futures = { workspace = true }
+kameo = "0.17.2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["signal", "io-std", "io-util", "rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11.1", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse"] }

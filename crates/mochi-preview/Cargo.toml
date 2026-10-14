@@ -1,0 +1,27 @@
+[package]
+name = "mochi-preview"
+description = "Preview của Mochi Studio: HWND con + swapchain wgpu, trình phát (đồng hồ = âm thanh), bộ trộn âm thanh"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+mochi-render = { path = "../mochi-render" }
+cap-audio = { path = "../../vendor/cap/crates/audio" }
+cap-project = { path = "../../vendor/cap/crates/project" }
+anyhow = { workspace = true }
+cpal = { workspace = true }
+raw-window-handle = "0.6"
+tokio = { workspace = true }
+tracing = { workspace = true }
+wgpu = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+] }

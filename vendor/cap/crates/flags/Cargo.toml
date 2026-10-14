@@ -1,0 +1,14 @@
+[package]
+name = "cap-flags"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"  # [MOCHI] theo vendor/cap/LICENSE
+publish = false  # [MOCHI]
+
+[dependencies]
+serde = { workspace = true }
+specta.workspace = true
+workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[lints]
+workspace = true

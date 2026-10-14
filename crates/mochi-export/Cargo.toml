@@ -1,0 +1,26 @@
+[package]
+name = "mochi-export"
+description = "Xuất project Mochi Studio ra MP4 / GIF: preflight, kiểm encoder, chạy ở tiến trình con, hàng đợi theo project"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+mochi-render = { path = "../mochi-render" }
+mochi-preview = { path = "../mochi-preview" }
+mochi-recorder = { path = "../mochi-recorder" }
+cap-enc-ffmpeg = { path = "../../vendor/cap/crates/enc-ffmpeg" }
+cap-enc-gif = { path = "../../vendor/cap/crates/enc-gif" }
+cap-media-info = { path = "../../vendor/cap/crates/media-info" }
+ffmpeg = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+specta = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11.1", features = ["v4"] }

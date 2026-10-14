@@ -1,0 +1,17 @@
+[package]
+name = "cap-enc-gif"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"  # [MOCHI] theo vendor/cap/LICENSE
+publish = false  # [MOCHI]
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+gifski = "1.32"
+imgref = "1.10"
+rgb = "0.8"
+workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[lints]
+workspace = true

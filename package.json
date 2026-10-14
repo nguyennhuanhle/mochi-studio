@@ -1,0 +1,10 @@
+{
+  "name": "mochi-studio",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "pnpm --filter @mochi/desktop tauri dev",
+    "build": "pnpm --filter @mochi/desktop tauri build"
+  },
+  "packageManager": "pnpm@10.25.0"
+}

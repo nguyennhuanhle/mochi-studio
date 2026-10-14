@@ -1,0 +1,17 @@
+[package]
+name = "mochi-jobs"
+description = "Tác vụ nền của Mochi Studio: proxy (S03), hàng đợi tạm hoãn khi đang quay (K-S4), quản lý cache (K-S3)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+cap-project = { path = "../../vendor/cap/crates/project" }
+mochi-export = { path = "../mochi-export" }
+ffmpeg = { workspace = true }
+serde = { workspace = true }
+specta = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

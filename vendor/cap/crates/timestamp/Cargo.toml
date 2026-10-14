@@ -1,0 +1,23 @@
+[package]
+name = "cap-timestamp"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"  # [MOCHI] theo vendor/cap/LICENSE
+publish = false  # [MOCHI]
+
+[features]
+
+[dependencies]
+cpal = { workspace = true }
+workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cidre = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_System_Performance",
+] }
+
+[lints]
+workspace = true

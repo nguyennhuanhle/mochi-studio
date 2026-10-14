@@ -1,0 +1,72 @@
+# cargo deny check bans licenses sources
+# Chạy trên gói app (mochi-desktop) và mochi-cli — các crate Cap vendor không dùng tới không tính.
+
+[graph]
+targets = ["x86_64-pc-windows-msvc"]
+exclude-dev = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+# K-S1 / K-S2: không thư viện nào có thể gửi dữ liệu ra mạng hoặc gửi telemetry / báo cáo crash.
+deny = [
+    { name = "reqwest", reason = "K-S1: HTTP client" },
+    { name = "ureq", reason = "K-S1: HTTP client" },
+    { name = "hyper", reason = "K-S1: HTTP client/server" },
+    { name = "isahc", reason = "K-S1: HTTP client" },
+    { name = "curl", reason = "K-S1: HTTP client" },
+    { name = "attohttpc", reason = "K-S1: HTTP client" },
+    { name = "surf", reason = "K-S1: HTTP client" },
+    { name = "axum", reason = "K-S1: HTTP server" },
+    { name = "tungstenite", reason = "K-S1: WebSocket" },
+    { name = "sentry", reason = "K-S2: báo cáo crash tự động" },
+    { name = "posthog-rs", reason = "K-S2: telemetry" },
+    { name = "tauri-plugin-http", reason = "K-S1" },
+    { name = "tauri-plugin-updater", reason = "K-S1 (S08 ở v1 sẽ xét lại)" },
+]
+
+[licenses]
+confidence-threshold = 0.85
+# Crate nội bộ (Mochi + Cap vendor, không phát hành): license ghi ở LICENSE và vendor/cap/PROVENANCE.md.
+private = { ignore = true }
+# Tương thích AGPL-3.0 (giấy phép của Mochi Studio).
+allow = [
+    "AGPL-3.0",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "GPL-3.0",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "GPL-2.0-or-later",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "MPL-2.0",
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "0BSD",
+    "Unlicense",
+    "WTFPL",
+    "CDLA-Permissive-2.0",
+    "NCSA",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-org = { github = ["CapSoftware"] }

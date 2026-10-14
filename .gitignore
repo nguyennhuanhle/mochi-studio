@@ -1,0 +1,13 @@
+/target/
+node_modules/
+dist/
+/_deliverables/
+/recordings/
+.cargo/config.toml
+apps/desktop/src-tauri/gen/
+*.partial
+*.tsbuildinfo
+
+# Ghi chép nội bộ (không public)
+/use-cases.md
+/docs/

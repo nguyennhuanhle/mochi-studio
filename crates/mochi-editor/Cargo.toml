@@ -1,0 +1,16 @@
+[package]
+name = "mochi-editor"
+description = "Phiên biên tập của Mochi Studio: mở/lưu project, import/relink media, áp EditOp, undo/redo, autosave"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+mochi-timeline = { path = "../mochi-timeline" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+specta = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

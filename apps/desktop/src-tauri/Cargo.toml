@@ -1,0 +1,58 @@
+[package]
+name = "mochi-desktop"
+description = "Mochi Studio — app desktop (Tauri v2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "mochi_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.4.1", features = [] }
+
+[dependencies]
+tauri = { workspace = true, features = [] }
+mochi-recorder = { path = "../../../crates/mochi-recorder" }
+mochi-project = { path = "../../../crates/mochi-project" }
+mochi-timeline = { path = "../../../crates/mochi-timeline" }
+mochi-editor = { path = "../../../crates/mochi-editor" }
+mochi-render = { path = "../../../crates/mochi-render" }
+mochi-preview = { path = "../../../crates/mochi-preview" }
+mochi-export = { path = "../../../crates/mochi-export" }
+mochi-jobs = { path = "../../../crates/mochi-jobs" }
+uuid = { version = "1.11.1", features = ["v4"] }
+base64 = "0.22"
+# Ghim theo Cargo.lock của Cap (tương thích Tauri 2.8.5)
+tauri-plugin-global-shortcut = "=2.3.0"
+tauri-plugin-opener = "=2.5.0"
+tauri-plugin-dialog = "=2.4.0"
+tauri-specta = { version = "=2.0.0-rc.20", features = ["derive", "typescript"] }
+specta = { workspace = true }
+specta-typescript = "0.0.7"
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+chrono = "0.4"
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wgpu = { workspace = true }
+raw-window-handle = "0.6"
+pollster = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_Storage_Xps",
+] }

@@ -1,0 +1,23 @@
+[package]
+name = "mochi-render"
+description = "Compositor nhiều track của Mochi Studio: render(project, t) → texture (dùng chung cho preview và export)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mochi-project = { path = "../mochi-project" }
+cap-rendering = { path = "../../vendor/cap/crates/rendering" }
+cap-project = { path = "../../vendor/cap/crates/project" }
+cap-editor = { path = "../../vendor/cap/crates/editor" }
+ffmpeg = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+specta = { workspace = true }
+cosmic-text = "0.14"
+anyhow = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+wgpu = { workspace = true }

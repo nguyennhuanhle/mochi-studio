@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Quyền cho cửa sổ chính và các cửa sổ phụ khi quay",
+  "windows": ["main", "recorder-bar", "countdown", "region-picker"],
+  "permissions": ["core:default"]
+}

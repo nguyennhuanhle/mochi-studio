@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Mochi Studio",
+  "version": "0.1.0",
+  "identifier": "studio.mochi.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Mochi Studio",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../../../LICENSE",
+    "publisher": "Mochi Studio contributors",
+    "copyright": "Copyright (c) 2026 Mochi Studio contributors — AGPL-3.0",
+    "shortDescription": "Quay màn hình và biên tập video",
+    "longDescription": "Mochi Studio: quay màn hình chuyên nghiệp và biên tập video với hiệu ứng tự động (nền, zoom theo click, con trỏ, webcam).",
+    "resources": {
+      "../../../target/release/avcodec-61.dll": "avcodec-61.dll",
+      "../../../target/release/avdevice-61.dll": "avdevice-61.dll",
+      "../../../target/release/avfilter-10.dll": "avfilter-10.dll",
+      "../../../target/release/avformat-61.dll": "avformat-61.dll",
+      "../../../target/release/avutil-59.dll": "avutil-59.dll",
+      "../../../target/release/postproc-58.dll": "postproc-58.dll",
+      "../../../target/release/swresample-5.dll": "swresample-5.dll",
+      "../../../target/release/swscale-8.dll": "swscale-8.dll",
+      "../../../target/release/dxcompiler.dll": "dxcompiler.dll",
+      "../../../target/release/dxil.dll": "dxil.dll",
+      "../../../legal/LICENSE-AGPL-3.0.txt": "licenses/LICENSE-AGPL-3.0.txt",
+      "../../../NOTICE": "licenses/NOTICE.txt",
+      "../../../THIRD_PARTY.md": "licenses/THIRD_PARTY.md",
+      "../../../legal/third-party-crates.txt": "licenses/third-party-crates.txt",
+      "../../../target/native-deps/FFMPEG-LICENSE.txt": "licenses/FFMPEG-LICENSE.txt",
+      "../../../legal/CAP-LICENSE.txt": "licenses/CAP-LICENSE.txt",
+      "../../../legal/CAP-LICENSE-MIT.txt": "licenses/CAP-LICENSE-MIT.txt"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Vietnamese",
+          "English"
+        ],
+        "displayLanguageSelector": true,
+        "installerIcon": "icons/icon.ico"
+      },
+      "wix": {
+        "language": [
+          "en-US"
+        ]
+      }
+    }
+  }
+}

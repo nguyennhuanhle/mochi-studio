@@ -1,0 +1,18 @@
+Mochi Studio
+Copyright (c) 2026 Mochi Studio contributors
+Licensed under the GNU Affero General Public License v3.0 only (see LICENSE).
+
+This product includes software from Cap (https://github.com/CapSoftware/Cap),
+Copyright (c) 2023-present Cap Software, Inc., vendored under vendor/cap/:
+  - Crates in the `cap-camera*` and `scap-*` families are licensed under the MIT License
+    (vendor/cap/licenses/LICENSE-MIT).
+  - All other vendored Cap code is licensed under the GNU AGPL v3.0.
+  - vendor/cap/crates/rnnoise contains Xiph RNNoise code (BSD-3-Clause).
+  See vendor/cap/PROVENANCE.md for the upstream commit and local modifications.
+
+This product includes a patched copy of wgpu-hal (vendor/wgpu-hal),
+licensed under MIT OR Apache-2.0.
+
+Binary distributions bundle FFmpeg 7.1 (GPL-3.0 build by Gyan Doshi,
+https://github.com/GyanD/codexffmpeg). Corresponding source: https://ffmpeg.org/releases/
+See THIRD_PARTY.md for the full list of third-party components.
