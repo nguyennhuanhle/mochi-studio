@@ -174,6 +174,12 @@ async systemAudioLevel() : Promise<Result<SystemAudioLevel, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * R10 (v1): máy có thu riêng tiếng một app được không (Windows 10 2004+).
+ */
+async appAudioSupported() : Promise<boolean> {
+    return await TAURI_INVOKE("app_audio_supported");
+},
 async systemAudioMeterStop() : Promise<void> {
     await TAURI_INVOKE("system_audio_meter_stop");
 },
@@ -1495,7 +1501,11 @@ export type RecorderWarning =
 /**
  * Pipeline lỗi giữa chừng → đã tự dừng và lưu phần đã quay.
  */
-{ code: "pipelineFailed"; detail: string }
+{ code: "pipelineFailed"; detail: string } | 
+/**
+ * R10 (v1): không thu riêng được tiếng app (Windows quá cũ / app không cho) → thu âm thanh hệ thống.
+ */
+{ code: "appAudioUnavailable" }
 export type RecordingConfig = { target: CaptureTarget; 
 /**
  * Tên mic (như trong danh sách thiết bị); None = không thu mic.
@@ -1525,7 +1535,11 @@ cursorHighlight?: CursorHighlight;
 /**
  * R08: thêm nền & khung (auto-polish) cho clip mới. Tắt = xuất trọn khung hình đã quay.
  */
-frame?: boolean }
+frame?: boolean; 
+/**
+ * R10 (v1): khi quay cửa sổ và bật âm thanh hệ thống — chỉ thu tiếng của app sở hữu cửa sổ.
+ */
+appAudioOnly?: boolean }
 /**
  * Hiệu ứng gắn với clip quay (E05–E09). `mochi-render` dịch sang `cap_project::ProjectConfiguration`
  * để renderer của Cap vẽ. Giá trị mặc định = bộ "auto-polish" (R08).

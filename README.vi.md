@@ -12,7 +12,7 @@
   <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
   <img alt="Nền tảng: Windows 10/11" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6">
   <img alt="Viết bằng Rust và Tauri" src="https://img.shields.io/badge/built%20with-Rust%20%2B%20Tauri%20v2-orange">
-  <img alt="Trạng thái: bản xem trước" src="https://img.shields.io/badge/status-0.1%20preview-yellow">
+  <img alt="Trạng thái: bản xem trước" src="https://img.shields.io/badge/status-0.2%20preview-yellow">
 </p>
 
 <p align="center">
@@ -51,6 +51,8 @@ Mọi thứ chạy trên máy. Không cần tài khoản, không tải lên clou
 - **Phím tắt toàn cục** (đổi được, tự phát hiện trùng phím), đếm ngược 0 / 3 / 5 / 10 giây, tạm dừng / quay tiếp (mỗi đoạn thành một segment), thanh điều khiển nổi nhỏ **không lọt vào bản quay**.
 - **Làm nổi con trỏ**: vòng sáng mềm quanh con trỏ (màu, cỡ, độ đậm), có trong trình biên tập và video xuất, không hiện trên màn hình lúc đang quay.
 - **Ghi phím bấm khi bạn bật**: mặc định tắt, có chế độ "chỉ phím tắt"; muốn ghi mọi phím phải xác nhận qua cảnh báo.
+- **Quay cửa sổ bám theo cửa sổ** khi bạn kéo nó đi, và có thể **chỉ thu tiếng của app đó** (Windows 10 bản 2004 trở lên) để thông báo của app khác không lọt vào.
+- **Preset quay**: lưu nhiều cấu hình có tên (vùng, nguồn, chất lượng, đếm ngược), đổi qua lại bằng một cú bấm.
 - **Chịu lỗi tốt**: ghi bằng fragmented MP4 nên khôi phục được sau crash; tự dừng an toàn khi ổ đầy; rút webcam hoặc mic thì vẫn quay tiếp và đánh dấu khoảng bị mất trên timeline.
 
 ### Tự làm đẹp
@@ -68,21 +70,31 @@ Bấm dừng là project mở thẳng trong trình biên tập, đã làm đẹp
 - Tỉ lệ khung 16:9, 9:16, 1:1 và 4:3; zoom và webcam tự canh lại.
 - Đổi tốc độ clip (0,25×–4×), fade, tách tiếng, waveform.
 - Nhập được MP4, MOV, MKV, WebM, MP3, WAV, M4A, PNG, JPG và GIF động.
+- **Chuyển động**: keyframe vị trí, tỉ lệ, xoay, độ mờ có easing; chuyển cảnh fade, slide, wipe; chữ hiện dần kiểu đánh máy.
+- **Chú thích**: callout, mũi tên, hình khối, spotlight một vùng, và overlay phím tắt lấy từ phím đã ghi.
+- **Hiệu ứng con trỏ**: spotlight, kính lúp, tiếng click, kiểu con trỏ, motion blur.
+- **Webcam**: làm mờ hoặc xóa nền bằng AI chạy trên máy, chroma key, bố cục chỉ webcam / chia đôi / thẻ nổi.
+- **Màu và khung**: sáng, tương phản, bão hòa, viền, khung laptop / điện thoại.
+- **Xử lý tiếng, chạy hết trên máy**: khử ồn, chuẩn hóa độ to −16 LUFS, nén, tự giảm nhạc nền khi có giọng nói.
+- **Phụ đề chạy trên máy** bằng Whisper (chỉ tải model khi bạn đồng ý): sửa chữ và thời gian, đổi kiểu, phụ đề động hiện từng chữ, nhập / xuất SRT / VTT.
+- Đứng hình (freeze frame), marker, nhóm clip, track nam châm, theme thương hiệu (màu, font) và preset hiệu ứng.
 - Phát hiện media bị thiếu và nối lại theo thư mục, tự tạo proxy cho media 4K, tự lưu mỗi 60 giây và giữ 10 bản sao lưu.
 
 ### Xuất
 - **MP4** với H.264, thêm HEVC và AV1 nếu GPU hỗ trợ; có mẫu YouTube 1080p, 4K và video dọc 9:16 cho mạng xã hội.
 - **GIF** với bảng màu tối ưu, cảnh báo khi GIF quá lớn.
 - Xuất cả project hoặc chỉ đoạn đã chọn (in / out).
+- **Chỉ âm thanh** (M4A / MP3), **WebM nền trong suốt**, phụ đề burn vào hình hoặc file `.srt` đi kèm.
+- **Xuất hàng loạt** nhiều project, hoặc mỗi marker một file; lưu khung hình hiện tại thành PNG; đóng gói project kèm toàn bộ media thành `.zip` để chuyển sang máy khác.
 - Xuất chạy ở **tiến trình riêng**: vẫn sửa tiếp được trong lúc xuất, hủy bất cứ lúc nào, và xếp hàng nhiều lần xuất.
 
 ## Trạng thái
 
-Mochi Studio đang ở **bản xem trước (0.1)**. Mọi use case của bản dùng được đầu tiên (MVP) đã làm xong và đã kiểm bằng bản quay thật. App chưa được thử trên nhiều máy, nên có thể còn lỗi. Mong bạn [báo lỗi](../../issues) khi gặp.
+Mochi Studio đang ở **bản xem trước (0.2)**. Mọi use case của bản dùng được đầu tiên (MVP) và của bản đầy đủ (v1) đã làm xong. App chưa được thử trên nhiều máy, nên có thể còn lỗi. Mong bạn [báo lỗi](../../issues) khi gặp.
 
 - **Hỗ trợ:** Windows 10 (bản 1903 trở lên) và Windows 11, 64-bit.
 - **Chưa hỗ trợ:** macOS (dự kiến làm sau, lớp quay đã được tách sẵn) và Linux.
-- **Dự kiến tiếp theo:** transition và keyframe, phụ đề bằng Whisper chạy local, khử ồn và chuẩn hóa độ to, hiện phím bấm trong video, callout và mũi tên, xóa nền webcam.
+- **Để sau:** vẽ lên màn hình trong lúc quay, sửa video bằng cách sửa transcript.
 
 Giao diện có **tiếng Anh** và **tiếng Việt**, mặc định theo ngôn ngữ hệ điều hành.
 
@@ -116,6 +128,7 @@ Bản quay được lưu mặc định ở `Videos\Mochi Studio\`.
 | Xóa / xóa và dồn | <kbd>Delete</kbd> / <kbd>Shift</kbd>+<kbd>Delete</kbd> |
 | Hoàn tác / làm lại | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 | Đặt điểm vào / ra, bỏ đoạn chọn | <kbd>I</kbd> / <kbd>O</kbd>, <kbd>X</kbd> |
+| Thêm marker | <kbd>M</kbd> |
 | Xuất | <kbd>Ctrl</kbd>+<kbd>E</kbd> |
 
 Phím tắt khi quay đổi được ở màn thiết lập quay. Nếu một phím đang bị app khác dùng, Mochi Studio sẽ gợi ý một phím còn trống.

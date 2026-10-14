@@ -12,7 +12,7 @@
   <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
   <img alt="Platform: Windows 10/11" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6">
   <img alt="Built with Rust and Tauri" src="https://img.shields.io/badge/built%20with-Rust%20%2B%20Tauri%20v2-orange">
-  <img alt="Status: early preview" src="https://img.shields.io/badge/status-0.1%20preview-yellow">
+  <img alt="Status: preview" src="https://img.shields.io/badge/status-0.2%20preview-yellow">
 </p>
 
 <p align="center">
@@ -51,6 +51,8 @@ Everything runs locally. There is no account, no cloud upload, and no telemetry.
 - **Global shortcuts** (rebindable, with conflict detection), a 0 / 3 / 5 / 10 second countdown, pause / resume (each part becomes a segment), and a small floating control bar that **never appears in the recording**.
 - **Cursor highlight**: a soft glow around the pointer (color, size and strength) that appears in the editor and in exports, not on your screen while recording.
 - **Opt-in keystroke capture**: off by default, with a "shortcuts only" mode; recording every key requires an explicit warning.
+- **Window recording that follows the window** when you move it, with an option to capture **only that app's audio** (Windows 10 2004 or later), so notifications from other apps stay out.
+- **Recording presets**: save named setups (area, sources, quality, countdown) and switch between them in one click.
 - **Resilient by design**: fragmented MP4 recording with crash recovery, a safe stop when the disk fills up, and recording continues if a webcam or microphone is unplugged (the lost range is marked on the timeline).
 
 ### Auto-polish
@@ -68,21 +70,31 @@ When you stop recording, the project opens straight in the editor, already polis
 - Aspect ratios 16:9, 9:16, 1:1 and 4:3, with zooms and the webcam re-laid out automatically.
 - Clip speed (0.25×–4×), fades, audio separation and waveforms.
 - Imports MP4, MOV, MKV, WebM, MP3, WAV, M4A, PNG, JPG and animated GIF.
+- **Motion**: keyframes for position, scale, rotation and opacity with easing; fade, slide and wipe transitions; text that types itself in.
+- **Annotations**: callouts, arrows and shapes, spotlight regions, and an on-screen keystroke overlay built from the recorded keys.
+- **Cursor effects**: spotlight, magnifier, click sounds, cursor styles and motion blur.
+- **Webcam**: local AI background blur or removal, chroma key, and camera-only, split-screen and floating-card layouts.
+- **Look**: brightness, contrast and saturation, borders, and laptop / phone device frames.
+- **Audio clean-up, all local**: noise reduction, loudness normalization to −16 LUFS, a compressor, and automatic ducking of music under speech.
+- **Local subtitles** with Whisper (the model is downloaded only after you agree): edit text and timing, style them, word-by-word animated captions, SRT / VTT import and export.
+- Freeze frames, markers, clip groups, magnetic tracks, a brand theme (colors and font) and saved effect presets.
 - Missing-media detection with relinking by folder, automatic proxies for 4K media, autosave every 60 seconds, and 10 rolling backups.
 
 ### Export
 - **MP4** with H.264, plus HEVC and AV1 when your GPU supports them; presets for YouTube 1080p, 4K and 9:16 social video.
 - **GIF** with an optimized palette, and a size warning for large GIFs.
 - Export the whole project or an in / out range.
+- **Audio only** (M4A / MP3), **WebM with a transparent background**, subtitles burned in or as an `.srt` file next to the video.
+- **Batch export** several projects, or one file per marker; save the current frame as PNG; pack a project with all its media into a `.zip` for another computer.
 - Export runs in a **separate process**: you can keep editing, cancel at any time, and queue several exports.
 
 ## Status
 
-Mochi Studio is an **early preview (0.1)**. Every use case planned for the first usable version (MVP) is implemented and has been verified with real recordings. It has not had broad testing on many machines yet, so expect rough edges and please [report issues](../../issues).
+Mochi Studio is a **preview (0.2)**. Every use case planned for the first usable version (MVP) and for the full version (v1) is implemented. It has not had broad testing on many machines yet, so expect rough edges and please [report issues](../../issues).
 
 - **Supported:** Windows 10 (1903 or later) and Windows 11, 64-bit.
 - **Not yet:** macOS (planned later, since the capture layer is already abstracted) and Linux.
-- **Planned next:** transitions and keyframes, local Whisper subtitles, noise reduction and loudness normalization, keystroke overlays, callouts and arrows, and webcam background removal.
+- **Later:** drawing on the screen while recording, and editing a video by editing its transcript.
 
 The interface is available in **English** and **Vietnamese** and follows the system language by default.
 
@@ -116,6 +128,7 @@ Recordings are saved to `Videos\Mochi Studio\` by default.
 | Delete / ripple delete | <kbd>Delete</kbd> / <kbd>Shift</kbd>+<kbd>Delete</kbd> |
 | Undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 | Set in / out point, clear range | <kbd>I</kbd> / <kbd>O</kbd>, <kbd>X</kbd> |
+| Add a marker | <kbd>M</kbd> |
 | Export | <kbd>Ctrl</kbd>+<kbd>E</kbd> |
 
 You can rebind the recording shortcuts from the recording setup screen. If another app already uses a key, Mochi Studio suggests a free alternative.

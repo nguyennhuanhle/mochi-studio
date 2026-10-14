@@ -60,6 +60,8 @@ pub enum RecorderWarning {
     AudioGap { gap_ms: f64 },
     /// Pipeline lỗi giữa chừng → đã tự dừng và lưu phần đã quay.
     PipelineFailed { detail: String },
+    /// R10 (v1): không thu riêng được tiếng app (Windows quá cũ / app không cho) → thu âm thanh hệ thống.
+    AppAudioUnavailable,
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]

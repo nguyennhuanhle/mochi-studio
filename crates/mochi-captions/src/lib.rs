@@ -138,6 +138,7 @@ pub fn transcribe(
     language: Option<&str>,
     offset: Ticks,
     cancel: Arc<AtomicBool>,
+    hold: Arc<AtomicBool>,
     progress: impl FnMut(i32) + 'static,
 ) -> Result<Vec<Caption>, String> {
     cpu_supported()?;
@@ -156,7 +157,14 @@ pub fn transcribe(
     params.set_print_special(false);
     params.set_progress_callback_safe(progress);
     let stop = cancel.clone();
-    params.set_abort_callback_safe(move || stop.load(Ordering::Relaxed));
+    // whisper gọi hàm này đều đặn trong lúc tính: `hold` bật (đang quay) → đứng chờ tại đây, tức là
+    // tạm dừng phiên âm cho tới khi dừng quay, không giành CPU với bản quay.
+    params.set_abort_callback_safe(move || {
+        while hold.load(Ordering::Relaxed) && !stop.load(Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        stop.load(Ordering::Relaxed)
+    });
     state.full(params, pcm).map_err(|e| if cancel.load(Ordering::Relaxed) { "đã hủy".to_string() } else { format!("phiên âm lỗi: {e}") })?;
 
     // whisper: mốc thời gian theo đơn vị 10 ms.

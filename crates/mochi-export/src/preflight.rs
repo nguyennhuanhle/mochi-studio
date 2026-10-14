@@ -143,6 +143,11 @@ pub fn preflight(
     if output.exists() && !s.overwrite {
         return Err(ExportError::FileExists { path: output });
     }
+    // K-X1 cho file phụ đề đi kèm (X05): cũng không ghi đè khi chưa xác nhận.
+    let srt = output.with_extension("srt");
+    if s.subtitles && !project.captions.is_empty() && srt.exists() && !s.overwrite {
+        return Err(ExportError::FileExists { path: srt });
+    }
 
     // K-X2
     let missing = missing_media(project, paths, &range);

@@ -1078,6 +1078,8 @@ pub struct SystemAudioSource {
     state: Arc<std::sync::Mutex<CapturerState>>,
     cancel_token: CancellationToken,
     audio_info: AudioInfo,
+    // [MOCHI] R10 (v1): Some = thu tiếng của riêng một ứng dụng thay cho cả thiết bị phát.
+    mochi_app: Option<super::mochi_app_audio::ProcessLoopback>,
 }
 
 struct SystemAudioResampler {
@@ -1279,6 +1281,33 @@ impl output_pipeline::AudioSource for SystemAudioSource {
     {
         let cancel_token = ctx.stop_token().child_token();
 
+        // [MOCHI] R10 (v1): chỉ thu tiếng app đang quay; mở không được → quay lại âm thanh hệ thống.
+        if let Some(pid) = super::mochi_app_audio::app_audio_pid() {
+            match super::mochi_app_audio::ProcessLoopback::open(pid, tx.clone(), ctx.health_tx().clone()) {
+                Ok(app) => {
+                    let state = Arc::new(std::sync::Mutex::new(CapturerState {
+                        capturer: None,
+                        is_started: false,
+                        device_name: String::new(),
+                    }));
+                    let audio_info = crate::sources::audio_mixer::AudioMixer::INFO;
+                    return futures::future::Either::Left(async move {
+                        Ok(Self {
+                            state,
+                            cancel_token,
+                            audio_info,
+                            mochi_app: Some(app),
+                        })
+                    });
+                }
+                Err(e) => {
+                    warn!("App audio unavailable, falling back to system audio: {e:#}");
+                    super::mochi_app_audio::MOCHI_APP_AUDIO_FELL_BACK
+                        .store(true, atomic::Ordering::Relaxed);
+                }
+            }
+        }
+
         ctx.tasks().spawn("system-audio", {
             let cancel = cancel_token.clone();
             async move {
@@ -1459,7 +1488,7 @@ impl output_pipeline::AudioSource for SystemAudioSource {
 
         let cancel = cancel_token.clone();
 
-        async move {
+        futures::future::Either::Right(async move {
             let capturer = setup_result.map_err(|e| anyhow!("{e}"))?;
             if capturer.has_silence_keepalive() {
                 info!("System audio loopback silence keepalive active");
@@ -1512,8 +1541,9 @@ impl output_pipeline::AudioSource for SystemAudioSource {
                 state,
                 cancel_token: cancel,
                 audio_info,
+                mochi_app: None,
             })
-        }
+        })
     }
 
     fn audio_info(&self) -> cap_media_info::AudioInfo {
@@ -1521,6 +1551,10 @@ impl output_pipeline::AudioSource for SystemAudioSource {
     }
 
     fn start(&mut self) -> impl Future<Output = anyhow::Result<()>> {
+        if let Some(app) = &self.mochi_app {
+            app.play();
+            return futures::future::ready(Ok(())).left_future();
+        }
         let result = match self.state.lock() {
             Ok(mut guard) => {
                 guard.is_started = true;
@@ -1531,11 +1565,14 @@ impl output_pipeline::AudioSource for SystemAudioSource {
             }
             Err(_) => Err(anyhow!("System audio state lock poisoned")),
         };
-        async move { result }
+        futures::future::ready(result).right_future()
     }
 
     fn stop(&mut self) -> impl Future<Output = anyhow::Result<()>> {
         self.cancel_token.cancel();
+        if let Some(app) = &mut self.mochi_app {
+            app.stop();
+        }
         if let Ok(guard) = self.state.lock()
             && let Some(ref capturer) = guard.capturer
             && let Err(err) = capturer.pause()

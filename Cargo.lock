@@ -1254,6 +1254,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "windows 0.60.0",
+ "windows-core 0.60.1",
  "workspace-hack",
  "x11rb",
 ]
@@ -4470,7 +4471,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-captions"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "mochi-project",
@@ -4482,7 +4483,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cap-audio",
@@ -4514,7 +4515,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4551,7 +4552,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-editor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mochi-project",
  "mochi-timeline",
@@ -4564,7 +4565,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-export"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cap-enc-ffmpeg",
@@ -4588,7 +4589,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-jobs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cap-project",
  "ffmpeg-next",
@@ -4602,7 +4603,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-preview"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cap-audio",
@@ -4621,7 +4622,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-project"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cap-project",
  "chrono",
@@ -4639,7 +4640,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-recorder"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4667,7 +4668,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-render"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cap-editor",
@@ -4688,7 +4689,7 @@ dependencies = [
 
 [[package]]
 name = "mochi-timeline"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "mochi-project",

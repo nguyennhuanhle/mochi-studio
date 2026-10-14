@@ -14,6 +14,9 @@ pub mod cadence;
 mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
+// [MOCHI] R10 (v1): thu tiếng của riêng ứng dụng đang quay.
+#[cfg(target_os = "windows")]
+pub mod mochi_app_audio;
 
 #[cfg(target_os = "macos")]
 mod macos;

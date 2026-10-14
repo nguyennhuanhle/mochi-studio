@@ -71,7 +71,7 @@ pub async fn run(secs: u64, camera: &str, mic: &str, pause_at: Option<u64>, keep
         keystrokes: KeystrokeMode::Off,
         output_root: root.clone(),
         cursor_highlight: Default::default(),
-        frame: true,
+        frame: true, app_audio_only: false,
     };
     let service = RecorderService::new();
     let mut events = service.subscribe();

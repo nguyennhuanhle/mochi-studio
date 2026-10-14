@@ -34,6 +34,12 @@ pub struct CaptionModel {
 }
 
 static CANCEL: std::sync::LazyLock<Arc<AtomicBool>> = std::sync::LazyLock::new(|| Arc::new(AtomicBool::new(false)));
+/// Luật Hệ thống: không chạy phiên âm trong lúc quay → bật khi đang quay, phiên âm đứng chờ.
+static RECORDING: std::sync::LazyLock<Arc<AtomicBool>> = std::sync::LazyLock::new(|| Arc::new(AtomicBool::new(false)));
+
+pub fn on_recorder_state(state: mochi_recorder::RecorderState) {
+    RECORDING.store(state != mochi_recorder::RecorderState::Idle, Ordering::Relaxed);
+}
 
 fn models_dir(app: &AppHandle) -> PathBuf {
     app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir()).join("models")
@@ -117,6 +123,10 @@ pub async fn captions_generate(app: AppHandle, model: String, language: Option<S
             if CANCEL.load(Ordering::Relaxed) {
                 return Err("đã hủy".to_string());
             }
+            if RECORDING.load(Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                continue;
+            }
             let n = chunk.min(total - at);
             mixer.fill(Ticks(at as i64 * mochi_preview::OfflineMixer::TICKS_PER_SAMPLE), &mut pcm48[at * 2..(at + n) * 2]);
             at += n;
@@ -131,6 +141,7 @@ pub async fn captions_generate(app: AppHandle, model: String, language: Option<S
             language.as_deref().filter(|l| !l.is_empty() && *l != "auto"),
             Ticks::ZERO,
             CANCEL.clone(),
+            RECORDING.clone(),
             move |p| {
                 let _ = CaptionsProgress { stage: "transcribe".into(), pct: p as f32 }.emit(&h2);
             },

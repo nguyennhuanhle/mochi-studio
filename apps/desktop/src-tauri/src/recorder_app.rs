@@ -67,6 +67,7 @@ fn on_recorder_event(app: &AppHandle, event: &RecorderEvent) {
     match event {
         RecorderEvent::StateChanged { state } => {
             crate::jobs_app::on_recorder_state(app, *state);
+            crate::captions_app::on_recorder_state(*state);
             match state {
             RecorderState::Countdown => {
                 hide_main_for_recording(app);
@@ -227,6 +228,13 @@ pub fn recovery_discard(
     recording_dir: PathBuf,
 ) -> Result<(), RecorderError> {
     recovery::discard(&output_root(&app, &settings), &recording_dir)
+}
+
+/// R10 (v1): máy có thu riêng tiếng một app được không (Windows 10 2004+).
+#[tauri::command]
+#[specta::specta]
+pub fn app_audio_supported() -> bool {
+    mochi_recorder::app_audio::supported()
 }
 
 /// R02: mức đỉnh của âm thanh hệ thống (bật thu loopback nếu chưa bật). UI gọi ~10 lần/giây.

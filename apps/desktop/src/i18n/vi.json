@@ -73,7 +73,10 @@
     "hotkeyFix": "Chọn phím khác…",
     "frameTitle": "Tự làm đẹp",
     "frame": "Thêm nền & khung (nền, khoảng đệm, bo góc, đổ bóng)",
-    "frameHint": "Bỏ chọn để video giữ trọn khung hình đã quay. Bật / tắt lại được trong trình biên tập."
+    "frameHint": "Bỏ chọn để video giữ trọn khung hình đã quay. Bật / tắt lại được trong trình biên tập.",
+    "appAudioOnly": "Chỉ thu tiếng của ứng dụng này",
+    "appAudioOnlyHint": "thông báo, nhạc của app khác không lọt vào video",
+    "appAudioUnsupported": "cần Windows 10 bản 2004 trở lên"
   },
   "bar": {
     "pause": "Tạm dừng",
@@ -138,7 +141,8 @@
     "encoderFallback": "Bộ mã hóa phần cứng không dùng được cho bản quay này — đang mã hóa bằng phần mềm ({{backend}}), tốn CPU hơn.",
     "audioGap": "Âm thanh bị ngắt quãng {{ms}} ms.",
     "pipelineFailed": "Có lỗi khi quay — đã tự dừng và lưu phần đã quay.",
-    "areaOutOfBounds": "Màn hình vừa đổi độ phân giải / tỉ lệ hiển thị nên vùng quay không còn nằm trong màn hình — đã tạm dừng. Hãy dừng và chọn lại vùng."
+    "areaOutOfBounds": "Màn hình vừa đổi độ phân giải / tỉ lệ hiển thị nên vùng quay không còn nằm trong màn hình — đã tạm dừng. Hãy dừng và chọn lại vùng.",
+    "appAudioUnavailable": "Không thu riêng được tiếng của ứng dụng này — đang thu toàn bộ âm thanh hệ thống."
   },
   "device": {
     "microphone": "mic",

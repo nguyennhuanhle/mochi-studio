@@ -5,6 +5,7 @@
 //! K-R3 (ghi phím phải opt-in), K-R4 (dung lượng ổ).
 
 mod activity;
+pub mod app_audio;
 mod config;
 pub mod disk;
 mod error;

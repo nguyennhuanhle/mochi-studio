@@ -337,7 +337,7 @@ impl Ctx<'_> {
         let mut pcm = Vec::new();
         let started = Instant::now();
         let mut last = Instant::now() - Duration::from_secs(1);
-        let mut write_packets = |enc: &mut ffmpeg::encoder::Audio, out: &mut ffmpeg::format::context::Output| -> Result<(), ExportError> {
+        let write_packets = |enc: &mut ffmpeg::encoder::Audio, out: &mut ffmpeg::format::context::Output| -> Result<(), ExportError> {
             let mut pkt = ffmpeg::Packet::empty();
             while enc.receive_packet(&mut pkt).is_ok() {
                 pkt.set_stream(stream_index);

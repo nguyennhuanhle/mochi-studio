@@ -245,6 +245,13 @@ impl RecorderService {
         RecorderError,
     > {
         let mut tasks = Vec::new();
+        // R10 (v1): chỉ thu tiếng của app sở hữu cửa sổ đang quay.
+        let want_app_audio = config.system_audio && config.app_audio_only;
+        let app_window = match &config.target {
+            CaptureTarget::Window { id } if want_app_audio => Some(id.as_str()),
+            _ => None,
+        };
+        let app_audio_armed = crate::app_audio::arm(app_window);
         let mut builder = studio_recording::Actor::builder(recording_dir.to_path_buf(), target)
             .with_system_audio(config.system_audio);
 
@@ -323,6 +330,9 @@ impl RecorderService {
         let actor = builder.build().await.map_err(|e| RecorderError::StartFailed {
             detail: format!("{e:#}"),
         })?;
+        if want_app_audio && (!app_audio_armed || crate::app_audio::fell_back()) {
+            self.warn(RecorderWarning::AppAudioUnavailable);
+        }
         Ok((actor, gate, mic_lock, camera_lock, tasks))
     }
 
@@ -763,6 +773,7 @@ fn reset_global_capture_state() {
     set_studio_health_sender(None);
     set_keyboard_capture_filter(KeyboardCaptureFilter::Off);
     scap_targets::mochi_follow::set(0, 0);
+    crate::app_audio::disarm();
 }
 
 fn track_kind(track: &str) -> DeviceKind {

@@ -778,11 +778,11 @@ fn add_clip(p: &mut Project, media_id: &str, track_id: Option<&str>, start: Tick
 fn trim(p: &mut Project, clip_id: &str, edge: Edge, to: Ticks) -> Result<(), TimelineError> {
     ensure_clip_unlocked(p, clip_id)?;
     let c = clip(p, clip_id)?.clone();
-    // Ảnh tĩnh kéo dài tùy ý; hình/tiếng bị giới hạn bởi độ dài media.
+    // Ảnh tĩnh và clip đứng hình (E04 v1) kéo dài tùy ý; hình/tiếng bị giới hạn bởi độ dài media.
     let media_len = match &c.media_id {
         Some(mid) => {
             let m = p.media.iter().find(|m| &m.id == mid).ok_or_else(|| not_found("media"))?;
-            (m.kind != MediaKind::Image).then_some(m.duration)
+            (m.kind != MediaKind::Image && c.hold.is_none()).then_some(m.duration)
         }
         None => None,
     };
@@ -1101,6 +1101,12 @@ mod tests {
         let tail = p.clips.iter().filter(|c| c.hold.is_some()).max_by_key(|c| c.start).unwrap();
         assert_eq!(tail.start, end);
         assert!(tail.hold.unwrap() < Ticks::from_secs(10.0));
+        // Khung đứng hình kéo dài tùy ý (không bị giới hạn bởi phần media còn lại).
+        let (tail_id, tail_start) = (tail.id.clone(), tail.start);
+        let p = crate::apply(&p, &EditOp::TrimClip { clip_id: tail_id.clone(), edge: Edge::End, to: tail_start + Ticks::from_secs(30.0) }).unwrap();
+        let tail = p.clips.iter().find(|c| c.id == tail_id).unwrap();
+        assert_eq!(tail.duration(), Ticks::from_secs(30.0));
+        assert_eq!(tail.source_time_at(tail_start + Ticks::from_secs(29.0)), tail.hold.unwrap());
     }
 
     #[test]

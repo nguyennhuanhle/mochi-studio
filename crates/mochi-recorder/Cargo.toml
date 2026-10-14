@@ -30,4 +30,4 @@ tracing = { workspace = true }
 uuid = { version = "1.11.1", features = ["v4"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { workspace = true, features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading"] }
+windows = { workspace = true, features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_Registry"] }

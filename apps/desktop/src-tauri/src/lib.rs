@@ -40,6 +40,7 @@ fn specta_builder() -> tauri_specta::Builder {
             recorder_app::hotkeys_set,
             recorder_app::hotkeys_suspend,
             recorder_app::system_audio_level,
+            recorder_app::app_audio_supported,
             recorder_app::system_audio_meter_stop,
             recorder_app::region_picker_open,
             recorder_app::region_picker_finish,

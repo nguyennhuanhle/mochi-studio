@@ -52,6 +52,12 @@ export default function Record() {
   const [highlight, setHighlight] = useState<CursorHighlight>(DEFAULT_HIGHLIGHT);
   /** R08: thêm nền & khung cho clip mới (tắt = xuất trọn khung hình đã quay). */
   const [frame, setFrame] = useState(true);
+  /** R10 (v1): quay cửa sổ → chỉ thu tiếng của app đó. */
+  const [appAudioOnly, setAppAudioOnly] = useState(false);
+  const [appAudioOk, setAppAudioOk] = useState(true);
+  useEffect(() => {
+    commands.appAudioSupported().then(setAppAudioOk);
+  }, []);
   const [confirmAllKeys, setConfirmAllKeys] = useState(false);
 
   const [starting, setStarting] = useState(false);
@@ -137,6 +143,7 @@ export default function Record() {
     setKeystrokes(c.keystrokes);
     if (c.cursorHighlight) setHighlight(c.cursorHighlight);
     setFrame(c.frame ?? true);
+    setAppAudioOnly(c.appAudioOnly ?? false);
   }
 
   /** Cấu hình đang chọn trên màn hình (dùng để bắt đầu quay và lưu preset). */
@@ -154,6 +161,7 @@ export default function Record() {
       outputRoot: settings.outputRoot,
       cursorHighlight: highlight,
       frame,
+      appAudioOnly: tab === "window" && appAudioOnly && appAudioOk,
     };
   }
 
@@ -407,6 +415,20 @@ export default function Record() {
               <small className="muted"> — {t("record.systemAudioHint")}</small>
             </span>
           </label>
+          {systemAudio && tab === "window" && (
+            <label className="check" style={{ marginLeft: 24 }}>
+              <input
+                type="checkbox"
+                checked={appAudioOnly && appAudioOk}
+                disabled={!appAudioOk}
+                onChange={(e) => setAppAudioOnly(e.target.checked)}
+              />
+              <span>
+                {t("record.appAudioOnly")}
+                <small className="muted"> — {appAudioOk ? t("record.appAudioOnlyHint") : t("record.appAudioUnsupported")}</small>
+              </span>
+            </label>
+          )}
           {systemAudio && (
             <>
               <div className="meter" aria-hidden>

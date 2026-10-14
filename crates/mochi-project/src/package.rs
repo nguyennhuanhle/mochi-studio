@@ -148,7 +148,7 @@ impl ProjectPackage {
                 .join(BACKUP_DIR)
                 .join(format!("pre-migrate-v{from}.json"));
             self.fs().copy(&src, &dst)?;
-            // Chuỗi migration: v0 → v1 (chưa có thay đổi cấu trúc).
+            // Chuỗi migration: v0 → v1 → v2 (v2 chỉ thêm trường có giá trị mặc định, serde tự điền).
             project.schema_version = SCHEMA_VERSION;
         }
         Ok(project)

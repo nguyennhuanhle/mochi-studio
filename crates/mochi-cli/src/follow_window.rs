@@ -15,7 +15,7 @@ use windows::{
 
 /// Cửa sổ thử phải thuộc tiến trình KHÁC (Cap bỏ qua cửa sổ của chính tiến trình đang quay):
 /// mở một form WinForms hồng, không viền, trên cùng bằng PowerShell rồi tìm HWND theo tiêu đề.
-fn spawn_test_window() -> anyhow::Result<(isize, std::process::Child)> {
+pub(crate) fn spawn_test_window() -> anyhow::Result<(isize, std::process::Child)> {
     let script = "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.Form;         $f.Text = 'Mochi follow test'; $f.FormBorderStyle = 'None'; $f.TopMost = $true;         $f.BackColor = [System.Drawing.Color]::FromArgb(255, 0, 255); $f.StartPosition = 'Manual';         $f.Location = New-Object System.Drawing.Point(0, 0); $f.Size = New-Object System.Drawing.Size(160, 120);         [System.Windows.Forms.Application]::Run($f)";
     let child = Command::new("powershell").args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", script]).spawn()?;
     for _ in 0..100 {
@@ -47,7 +47,7 @@ pub async fn run() -> anyhow::Result<()> {
         keystrokes: KeystrokeMode::Off,
         output_root: root.clone(),
         cursor_highlight: Default::default(),
-        frame: true,
+        frame: true, app_audio_only: false,
     };
     let paths = service.start(config, "Follow".into()).await.map_err(|e| anyhow::anyhow!("{e:?}"))?;
     tokio::time::sleep(Duration::from_millis(1200)).await;
@@ -89,7 +89,7 @@ pub async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+pub(crate) fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut v = vec![];
     if let Ok(rd) = std::fs::read_dir(dir) {
         for e in rd.flatten() {

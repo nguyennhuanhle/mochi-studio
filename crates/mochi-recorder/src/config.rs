@@ -77,6 +77,9 @@ pub struct RecordingConfig {
     /// R08: thêm nền & khung (auto-polish) cho clip mới. Tắt = xuất trọn khung hình đã quay.
     #[serde(default = "yes")]
     pub frame: bool,
+    /// R10 (v1): khi quay cửa sổ và bật âm thanh hệ thống — chỉ thu tiếng của app sở hữu cửa sổ.
+    #[serde(default)]
+    pub app_audio_only: bool,
 }
 
 fn yes() -> bool {

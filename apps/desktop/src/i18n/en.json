@@ -73,7 +73,10 @@
     "hotkeyFix": "Pick another key…",
     "frameTitle": "Auto-polish",
     "frame": "Add background & frame (background, padding, corners, shadow)",
-    "frameHint": "Untick to keep the full recorded frame. You can turn it on or off later in the editor."
+    "frameHint": "Untick to keep the full recorded frame. You can turn it on or off later in the editor.",
+    "appAudioOnly": "Only this app's audio",
+    "appAudioOnlyHint": "notifications and music from other apps stay out of the video",
+    "appAudioUnsupported": "requires Windows 10 version 2004 or later"
   },
   "bar": {
     "pause": "Pause",
@@ -138,7 +141,8 @@
     "encoderFallback": "The hardware encoder can't be used for this recording — encoding in software ({{backend}}), which uses more CPU.",
     "audioGap": "Audio dropped out for {{ms}} ms.",
     "pipelineFailed": "Recording hit an error — stopped and saved what was recorded.",
-    "areaOutOfBounds": "The display changed resolution / scaling and the recording area is no longer inside it — paused. Stop and pick the area again."
+    "areaOutOfBounds": "The display changed resolution / scaling and the recording area is no longer inside it — paused. Stop and pick the area again.",
+    "appAudioUnavailable": "Couldn't capture this app's audio on its own — recording all system audio instead."
   },
   "device": {
     "microphone": "microphone",
