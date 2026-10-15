@@ -18,6 +18,18 @@ pnpm install
 pnpm dev
 ```
 
+### Keeping `target/` small
+
+Cargo creates a new incremental cache every time a crate is built with a different set of options (another `-p`, `cargo test`, `cargo check`, a feature or version change) and never removes the old ones, so `target/` can grow past 100 GB. Clean it with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/clean.ps1 -DryRun   # preview
+powershell -ExecutionPolicy Bypass -File scripts/clean.ps1           # incremental caches only (safe)
+powershell -ExecutionPolicy Bypass -File scripts/clean.ps1 -Deep -Bundles
+```
+
+Do not run `cargo clean` or delete `target/` itself: `target/native-deps` holds FFmpeg, CMake and ONNX Runtime from `setup.ps1`, and the DLLs that `setup.ps1` copies next to the executables are not rebuilt by Cargo. `clean.ps1` keeps both. If you do wipe them, run `setup.ps1` again (it only downloads what is missing).
+
 ## Making a change
 
 1. Fork the repository and create a branch from `main`.
